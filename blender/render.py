@@ -321,6 +321,10 @@ def prepare_for_desktop(scene):
     """Settings for opening the saved .blend in desktop Blender: GPU if the
     user has one enabled, light viewport sampling, and 3D views that look
     through the active camera in Material Preview."""
+    # The glTF importer leaves everything selected (orange outlines in the UI).
+    for obj in scene.objects:
+        obj.select_set(False)
+    bpy.context.view_layer.objects.active = None
     scene.cycles.device = "GPU"
     scene.cycles.preview_samples = 32
     scene.cycles.use_preview_denoising = True
