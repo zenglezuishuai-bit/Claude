@@ -1,0 +1,475 @@
+<title>Flinders Street Station 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the 3D scene fills the screen; UI floats on it as railway-signage
+   panels (title plate top-left, controls top-right, info card, chip rail). */
+:root {
+  --panel: rgba(240, 244, 242, 0.92);
+  --panel-solid: #eef2f0;
+  --ink: #1b2522;
+  --muted: #56645f;
+  --line: rgba(27, 37, 34, 0.14);
+  --verdigris: #2f7d68;
+  --ochre: #c58a1c;
+  --brick: #a8482c;
+  --on-accent: #ffffff;
+  --shadow: 0 6px 24px rgba(16, 28, 24, 0.18);
+  --f-display: 'Noto Serif SC', 'Songti SC', 'STSong', Georgia, serif;
+  --f-body: 'IBM Plex Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --bg: #b9c9d3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --panel: rgba(20, 27, 25, 0.9); --panel-solid: #151c1a; --ink: #e3ebe8; --muted: #9aaba5;
+    --line: rgba(227, 235, 232, 0.14); --verdigris: #6cc3a8; --ochre: #e0ae4c; --brick: #e07a5a;
+    --on-accent: #0e1513; --shadow: 0 6px 24px rgba(0, 0, 0, 0.45); --bg: #1d2a30; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --panel: rgba(20, 27, 25, 0.9); --panel-solid: #151c1a; --ink: #e3ebe8; --muted: #9aaba5;
+  --line: rgba(227, 235, 232, 0.14); --verdigris: #6cc3a8; --ochre: #e0ae4c; --brick: #e07a5a;
+  --on-accent: #0e1513; --shadow: 0 6px 24px rgba(0, 0, 0, 0.45); --bg: #1d2a30; color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#app { position: relative; height: 100%; }
+canvas#view { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 6px; }
+
+.plate { position: absolute; top: 16px; left: 16px; padding: 12px 16px 12px 14px; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); }
+.plate .badge { width: 34px; height: 34px; border-radius: 50%; background: var(--verdigris); color: var(--on-accent); display: grid; place-items: center; font: 600 13px/1 var(--f-mono); flex: none; }
+.plate h1 { margin: 0; font: 800 18px/1.15 var(--f-display); letter-spacing: 0.01em; text-wrap: balance; }
+.plate p { margin: 2px 0 0; font: 400 11px/1.3 var(--f-mono); color: var(--muted); letter-spacing: 0.04em; }
+
+.tools { position: absolute; top: 16px; right: 16px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; width: 260px; }
+.tools label { display: flex; justify-content: space-between; font: 500 11px/1 var(--f-mono); letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
+.tools output { color: var(--ink); font-variant-numeric: tabular-nums; }
+.tools input[type=range] { width: 100%; accent-color: var(--verdigris); }
+.btnrow { display: flex; gap: 6px; }
+button { font: 500 13px/1 var(--f-body); color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; cursor: pointer; }
+button:hover { border-color: var(--verdigris); }
+button:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
+button.primary { background: var(--verdigris); color: var(--on-accent); border-color: var(--verdigris); }
+.btnrow button { flex: 1; }
+
+.card { position: absolute; right: 16px; bottom: 76px; width: 340px; max-width: calc(100% - 32px); padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 8px; }
+.card .eyebrow { font: 500 11px/1 var(--f-mono); color: var(--ochre); letter-spacing: 0.08em; text-transform: uppercase; }
+.card h2 { margin: 0; font: 800 22px/1.2 var(--f-display); text-wrap: balance; }
+.card p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--ink); }
+.card .close { position: absolute; top: 8px; right: 8px; border: none; font-size: 18px; padding: 4px 8px; color: var(--muted); }
+
+.rail { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; gap: 6px; overflow-x: auto; padding: 6px; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail button { white-space: nowrap; background: var(--panel-solid); font-size: 13px; }
+.rail button[aria-pressed="true"] { background: var(--verdigris); border-color: var(--verdigris); color: var(--on-accent); }
+
+.pin { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); padding: 4px 8px; font: 600 12px/1 var(--f-body); border-radius: 3px; background: var(--panel-solid); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); white-space: nowrap; pointer-events: auto; }
+.pin::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 1px; height: 6px; background: var(--ink); }
+#pins { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+.walkpad { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; }
+.walkpad button { width: 56px; height: 44px; font-size: 18px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.hint { position: absolute; left: 16px; top: 84px; padding: 8px 12px; font: 400 12px/1.5 var(--f-mono); color: var(--muted); max-width: 300px; }
+
+.gallery { position: absolute; inset: 0; background: var(--panel-solid); display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow-y: auto; }
+.gallery-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gallery h2 { margin: 0; font: 800 20px/1.2 var(--f-display); }
+.gallery figure { margin: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.gallery figure img { width: 100%; max-height: calc(100vh - 220px); object-fit: contain; background: var(--bg); border-radius: 4px; }
+.gallery figcaption { font: 400 12px/1.5 var(--f-mono); color: var(--muted); }
+.thumbs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.thumbs button { padding: 0; border: 2px solid transparent; border-radius: 4px; flex: none; }
+.thumbs button[aria-pressed="true"] { border-color: var(--verdigris); }
+.thumbs img { display: block; width: 132px; height: 74px; object-fit: cover; border-radius: 2px; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg); font: 500 13px/1 var(--f-mono); color: var(--ink); letter-spacing: 0.08em; }
+.note { position: absolute; left: 16px; bottom: 70px; font: 400 10px/1.4 var(--f-mono); color: var(--muted); background: var(--panel); padding: 4px 8px; border-radius: 3px; }
+
+@media (max-width: 640px) {
+  .plate { padding: 10px 12px; }
+  .plate h1 { font-size: 15px; }
+  .tools { top: auto; bottom: 70px; left: 16px; right: 16px; width: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 8px 10px; }
+  .tools .slider { flex: 1 1 100%; }
+  .tools .btnrow { flex: 1 1 100%; }
+  .card { left: 16px; right: 16px; bottom: 186px; width: auto; max-height: 40%; overflow-y: auto; }
+  .walkpad { bottom: 186px; }
+  .note { display: none; }
+  .hint { top: 72px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="app">
+  <canvas id="view" tabindex="0" aria-label="弗林德斯街车站三维场景"></canvas>
+  <div id="pins"></div>
+
+  <header class="plate panel">
+    <div class="badge" aria-hidden="true">FSS</div>
+    <div>
+      <h1>弗林德斯街车站</h1>
+      <p>FLINDERS ST · MELBOURNE · 37.818°S 144.967°E</p>
+    </div>
+  </header>
+
+  <section class="tools panel" aria-label="视图控制">
+    <div class="slider">
+      <label for="time">时间 <output id="timeOut">17:30</output></label>
+      <input id="time" type="range" min="6.5" max="19.5" step="0.1" value="17.5">
+    </div>
+    <div class="btnrow">
+      <button id="walkBtn" type="button">街景漫游</button>
+      <button id="resetBtn" type="button">总览</button>
+      <button id="galleryBtn" type="button">渲染图</button>
+    </div>
+  </section>
+
+  <article class="card panel" id="card" hidden aria-live="polite">
+    <button class="close" id="closeCard" type="button" aria-label="关闭">×</button>
+    <div class="eyebrow" id="cardEyebrow"></div>
+    <h2 id="cardTitle"></h2>
+    <p id="cardText"></p>
+  </article>
+
+  <div class="hint panel" id="walkHint" hidden>漫游中：拖动看四周 · W A S D / 方向键移动 · Shift 加速</div>
+  <div class="walkpad panel" id="walkpad" hidden>
+    <button type="button" data-move="fwd" aria-label="前进">▲</button>
+    <button type="button" data-move="back" aria-label="后退">▼</button>
+  </div>
+
+  <div class="note">示意模型 · 尺寸为估算 · 点击建筑查看介绍</div>
+  <nav class="rail" id="rail" aria-label="地点"></nav>
+  <section class="gallery" id="gallery" hidden aria-label="Blender 渲染图">
+    <div class="gallery-bar">
+      <h2>Blender Cycles 渲染</h2>
+      <button id="galleryClose" type="button">返回三维场景</button>
+    </div>
+    <figure>
+      <img id="galleryImg" alt="">
+      <figcaption id="galleryCap"></figcaption>
+    </figure>
+    <div class="thumbs" id="thumbs"></div>
+  </section>
+  <div class="loading" id="loading">正在生成模型…</div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { buildStation, PARTS } from './src/station.js';
+
+const canvas = document.getElementById('view');
+const isSmall = matchMedia('(max-width: 640px)').matches;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, isSmall ? 1.5 : 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xc9d3d8, 500, 1500);
+const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 4000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 8;
+controls.maxDistance = 900;
+
+// Sky, sun and image-based light.
+const sky = new Sky();
+sky.scale.setScalar(10000);
+const skyU = sky.material.uniforms;
+skyU.turbidity.value = 4; skyU.rayleigh.value = 1.4; skyU.mieCoefficient.value = 0.004; skyU.mieDirectionalG.value = 0.8;
+scene.add(sky);
+const sun = new THREE.DirectionalLight(0xffffff, 3);
+sun.castShadow = true;
+sun.shadow.mapSize.setScalar(isSmall ? 2048 : 4096);
+Object.assign(sun.shadow.camera, { left: -260, right: 260, top: 260, bottom: -260, near: 10, far: 1400 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.6;
+sun.target.position.set(-100, 0, 30);
+scene.add(sun, sun.target);
+const hemi = new THREE.HemisphereLight(0xcfe0ff, 0x8a7a66, 0.6);
+scene.add(hemi);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+const envSky = new Sky(); envSky.scale.setScalar(1000); envScene.add(envSky);
+let envRT = null;
+
+function setTime(h) {
+  // Melbourne in spring: sunrise in the east (+X), noon to the north (-Z).
+  const t = (h - 6.2) / (19.8 - 6.2);
+  const theta = Math.PI * THREE.MathUtils.clamp(t, 0, 1);
+  const elev = THREE.MathUtils.degToRad(Math.max(1.5, 58 * Math.sin(theta)));
+  const dir = new THREE.Vector3(Math.cos(theta) * Math.cos(elev), Math.sin(elev), -Math.sin(theta) * Math.cos(elev));
+  skyU.sunPosition.value.copy(dir);
+  envSky.material.uniforms.sunPosition.value.copy(dir);
+  for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG']) envSky.material.uniforms[k].value = skyU[k].value;
+  sun.position.copy(sun.target.position).addScaledVector(dir, 600);
+  const warm = THREE.MathUtils.smoothstep(THREE.MathUtils.radToDeg(elev), 2, 30);
+  sun.color.setRGB(1, 0.62 + 0.36 * warm, 0.38 + 0.56 * warm);
+  sun.intensity = 1.2 + 2.2 * warm;
+  hemi.intensity = 0.35 + 0.5 * warm;
+  if (envRT) envRT.dispose();
+  envRT = pmrem.fromScene(envScene);
+  scene.environment = envRT.texture;
+  scene.environmentIntensity = 0.05 + 0.1 * warm;
+  scene.fog.color.setHSL(0.58, 0.18, 0.55 + 0.25 * warm);
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  document.getElementById('timeOut').textContent = `${String(hh).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`;
+}
+
+// Build the model; every mesh gets its own material copy so a part can glow on hover.
+const model = buildStation();
+const pickables = [];
+const partMeshes = {};
+model.traverse((o) => {
+  if (!o.isMesh) return;
+  o.material = o.material.clone();
+  o.userData.baseEmissive = o.material.emissive.clone();
+  const key = o.userData.part;
+  if (key !== 'ground') pickables.push(o);
+  (partMeshes[key] ||= []).push(o);
+});
+scene.add(model);
+document.getElementById('loading').hidden = true;
+
+// Views and the chip rail.
+const HOME = { pos: [75, 58, -20], target: [-70, 4, 12] };
+const rail = document.getElementById('rail');
+const order = ['dome', 'facade', 'centre', 'clocktower', 'platforms', 'stpauls', 'fedsq', 'youngjackson', 'eureka'];
+for (const key of order) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = PARTS[key].title; b.dataset.part = key;
+  b.setAttribute('aria-pressed', 'false');
+  b.addEventListener('click', () => select(key));
+  rail.append(b);
+}
+
+// Floating labels above key places.
+const PIN_AT = { dome: [-13, 54, 13], clocktower: [-202, 63, 4], centre: [-110, 27, -1], stpauls: [75, 95, -65], fedsq: [70, 26, 40], platforms: [-150, 9, 70] };
+const pinsEl = document.getElementById('pins');
+const pins = Object.entries(PIN_AT).map(([key, p]) => {
+  const el = document.createElement('button');
+  el.type = 'button'; el.className = 'pin'; el.textContent = PARTS[key].title.replace(/与.*$/, '');
+  el.addEventListener('click', () => select(key));
+  pinsEl.append(el);
+  return { el, v: new THREE.Vector3(...p) };
+});
+
+let fly = null;
+function flyTo(view, ms = 1400) {
+  fly = {
+    t0: performance.now(), ms,
+    p0: camera.position.clone(), p1: new THREE.Vector3(...view.pos),
+    q0: controls.target.clone(), q1: new THREE.Vector3(...view.target),
+  };
+  // Presets are framed for landscape; back off on narrow (portrait) screens.
+  const back = Math.max(1, (1.4 / camera.aspect) ** 0.7);
+  fly.p1.sub(fly.q1).multiplyScalar(back).add(fly.q1);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) fly.ms = 1;
+}
+
+const card = document.getElementById('card');
+let selected = null;
+function select(key) {
+  if (walking) setWalk(false);
+  selected = key;
+  const p = PARTS[key];
+  document.getElementById('cardEyebrow').textContent = p.subtitle;
+  document.getElementById('cardTitle').textContent = p.title;
+  document.getElementById('cardText').textContent = p.text;
+  card.hidden = false;
+  for (const b of rail.children) b.setAttribute('aria-pressed', String(b.dataset.part === key));
+  flyTo(p.view);
+  applyGlow();
+}
+document.getElementById('closeCard').addEventListener('click', () => { card.hidden = true; selected = null; applyGlow(); for (const b of rail.children) b.setAttribute('aria-pressed', 'false'); });
+document.getElementById('resetBtn').addEventListener('click', () => { if (walking) setWalk(false); flyTo(HOME); });
+
+// Glow: the selected part glows more than the hovered one.
+let hovered = null;
+const glowing = new Set();
+function applyGlow() {
+  const want = new Map();
+  if (hovered) want.set(hovered, 0.08);
+  if (selected) want.set(selected, 0.1);
+  for (const k of new Set([...glowing, ...want.keys()])) {
+    const amt = want.get(k) || 0;
+    for (const m of partMeshes[k] || []) {
+      m.material.emissive.copy(m.userData.baseEmissive);
+      if (amt) m.material.emissive.add(new THREE.Color(amt, amt * 0.8, amt * 0.4));
+    }
+  }
+  glowing.clear();
+  for (const k of want.keys()) glowing.add(k);
+}
+
+// Picking: hover highlights, click (without drag) selects.
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function pick(ev) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(pickables, false)[0];
+  return hit ? hit.object.userData.part : null;
+}
+let down = null;
+canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerup', (e) => {
+  if (!down || walking) return;
+  if (Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) {
+    const key = pick(e);
+    if (key && PARTS[key]) select(key);
+  }
+  down = null;
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse' || walking || e.buttons) return;
+  const key = pick(e);
+  const next = key && PARTS[key] ? key : null;
+  canvas.style.cursor = next ? 'pointer' : '';
+  if (next !== hovered) { hovered = next; applyGlow(); }
+});
+
+// Street-level walk mode.
+let walking = false;
+let yaw = 0, pitch = 0;
+const keys = new Set();
+const padHeld = new Set();
+function setWalk(on) {
+  walking = on;
+  controls.enabled = !on;
+  document.getElementById('walkBtn').classList.toggle('primary', on);
+  document.getElementById('walkBtn').textContent = on ? '退出漫游' : '街景漫游';
+  document.getElementById('walkHint').hidden = !on || isSmall;
+  document.getElementById('walkpad').hidden = !on;
+  pinsEl.hidden = on;
+  if (on) {
+    card.hidden = true;
+    fly = null;
+    camera.position.set(-30, 1.7, -24);
+    yaw = Math.atan2(-(-12 - -30), -(6 - -24));
+    pitch = 0.12;
+    canvas.focus();
+  } else {
+    flyTo(HOME, 900);
+  }
+}
+document.getElementById('walkBtn').addEventListener('click', () => setWalk(!walking));
+addEventListener('keydown', (e) => { if (walking) { keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); } });
+addEventListener('keyup', (e) => keys.delete(e.code));
+let look = null;
+canvas.addEventListener('pointerdown', (e) => { if (walking) { look = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); } });
+canvas.addEventListener('pointermove', (e) => {
+  if (!walking || !look) return;
+  yaw -= (e.clientX - look.x) * 0.004;
+  pitch = THREE.MathUtils.clamp(pitch - (e.clientY - look.y) * 0.004, -1.2, 1.2);
+  look = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('pointerup', () => { look = null; });
+for (const b of document.querySelectorAll('#walkpad button')) {
+  const m = b.dataset.move;
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); padHeld.add(m); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => padHeld.delete(m));
+}
+
+function stepWalk(dt) {
+  const fwd = (keys.has('KeyW') || keys.has('ArrowUp') || padHeld.has('fwd') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') || padHeld.has('back') ? 1 : 0);
+  const side = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  const turn = (keys.has('ArrowLeft') ? 1 : 0) - (keys.has('ArrowRight') ? 1 : 0);
+  yaw += turn * dt * 1.4;
+  const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 14 : 5) * dt;
+  const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const r = new THREE.Vector3(-f.z, 0, f.x);
+  camera.position.addScaledVector(f, fwd * speed).addScaledVector(r, side * speed);
+  camera.position.y = 1.7;
+  camera.rotation.set(pitch, yaw, 0, 'YXZ');
+}
+
+// Resize and render loop.
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+const timeInput = document.getElementById('time');
+timeInput.addEventListener('input', () => setTime(parseFloat(timeInput.value)));
+setTime(parseFloat(timeInput.value));
+camera.position.set(...HOME.pos);
+controls.target.set(...HOME.target);
+{ const back = Math.max(1, (1.4 / camera.aspect) ** 0.7); camera.position.sub(controls.target).multiplyScalar(back).add(controls.target); }
+
+const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const tmp = new THREE.Vector3();
+let last = performance.now();
+renderer.setAnimationLoop((now) => {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (walking) {
+    stepWalk(dt);
+  } else {
+    if (fly) {
+      const t = Math.min(1, (now - fly.t0) / fly.ms);
+      const k = ease(t);
+      camera.position.lerpVectors(fly.p0, fly.p1, k);
+      controls.target.lerpVectors(fly.q0, fly.q1, k);
+      if (t >= 1) fly = null;
+    }
+    controls.update();
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    for (const p of pins) {
+      tmp.copy(p.v).project(camera);
+      const vis = tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
+      p.el.hidden = !vis;
+      if (vis) p.el.style.translate = `${((tmp.x + 1) / 2) * w}px ${((1 - tmp.y) / 2) * h}px`;
+    }
+  }
+  renderer.render(scene, camera);
+});
+// Gallery of offline Blender renders shipped next to the page.
+const RENDERS = [
+  ['hero', '主入口与铜穹顶 · 上午阳光'],
+  ['dome', '穹顶与"钟下"入口 · 近景'],
+  ['facade', 'Flinders Street 立面 · 傍晚'],
+  ['clocktower', '钟楼 · 傍晚'],
+  ['aerial', '鸟瞰 · 车站与亚拉河'],
+];
+const gallery = document.getElementById('gallery');
+const thumbs = document.getElementById('thumbs');
+function showRender(i) {
+  const [name, cap] = RENDERS[i];
+  document.getElementById('galleryImg').src = `renders/web/${name}.jpg`;
+  document.getElementById('galleryImg').alt = cap;
+  document.getElementById('galleryCap').textContent = `${cap} — Cycles 路径追踪，1920×1080，128 采样 + 降噪`;
+  for (const [j, b] of [...thumbs.children].entries()) b.setAttribute('aria-pressed', String(j === i));
+}
+RENDERS.forEach(([name, cap], i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.setAttribute('aria-label', cap);
+  const im = document.createElement('img'); im.src = `renders/web/${name}.jpg`; im.alt = ''; im.loading = 'lazy';
+  b.append(im); b.addEventListener('click', () => showRender(i));
+  thumbs.append(b);
+});
+document.getElementById('galleryBtn').addEventListener('click', () => { if (walking) setWalk(false); gallery.hidden = false; showRender(0); });
+document.getElementById('galleryClose').addEventListener('click', () => { gallery.hidden = true; });
+
+window.__setView = (v) => { fly = null; camera.position.set(...v.pos); controls.target.set(...v.target); controls.update(); };
+window.__ready = true;
+</script>
