@@ -18,14 +18,19 @@ from mathutils import Vector
 
 VIEWS = {
     # name: (camera position, look-at target, focal length mm)
-    "hero": ((22, 34, -40), (-34, 15, 14), 26),
-    "dome": ((30, 9, -32), (-12, 15, 12), 32),
+    # Several match a reference photo in reference/ so the two can be compared.
+    "hero": ((30, 30, -36), (-30, 13, 16), 26),
+    "dome": ((22, 1.7, -25), (-14, 15, 12), 24),            # like reference/02.jpg
     "facade": ((-62, 9, -21), (-140, 9, 2), 28),
-    "clocktower": ((-238, 12, -25), (-203, 31, 4), 26),
+    "clocktower": ((-193, 1.7, -46), (-190, 36, 0), 20),   # like reference/06.jpg
     "aerial": ((120, 210, -260), (-90, 0, 40), 40),
+    "rialto": ((-290, 240, -190), (-110, 0, 45), 48),      # like reference/09.jpg
 }
 
-# Sun presets: (azimuth degrees clockwise from north, elevation degrees, strength)
+# The model's +X axis (Flinders St) bears this many degrees from true north.
+GRID_BEARING = 71
+
+# Sun presets: (azimuth degrees clockwise from true north, elevation degrees, strength)
 SUNS = {
     "morning": (62, 24, 3.2),
     "golden": (300, 9, 2.6),
@@ -132,8 +137,8 @@ def mat_brick():
     bt.inputs["Brick Width"].default_value = 0.23
     bt.inputs["Row Height"].default_value = 0.076
     bt.inputs["Mortar Size"].default_value = 0.01
-    bt.inputs["Color1"].default_value = (*srgb(0xa3452a), 1)
-    bt.inputs["Color2"].default_value = (*srgb(0x8c3a24), 1)
+    bt.inputs["Color1"].default_value = (*srgb(0x9a3c26), 1)
+    bt.inputs["Color2"].default_value = (*srgb(0x86331f), 1)
     bt.inputs["Mortar"].default_value = (*srgb(0xcfc3ad), 1)
     bt.offset = 0.5
     nt.links.new(vec, bt.inputs["Vector"])
@@ -166,7 +171,7 @@ def mat_copper():
     nt, bsdf = new_mat("copper")
     tc = nt.nodes.new("ShaderNodeTexCoord")
     n = noise(nt, tc.outputs["Object"], 1.6, 8, 0.7)
-    col = ramp(nt, n.outputs["Fac"], srgb(0x3f7f68), srgb(0x86c4ad), 0.35, 0.72)
+    col = ramp(nt, n.outputs["Fac"], srgb(0x34503f), srgb(0x7fae95), 0.3, 0.75)
     streak = noise(nt, tc.outputs["Object"], 9, 4, 0.5)
     mix = nt.nodes.new("ShaderNodeMix"); mix.data_type = "RGBA"; mix.blend_type = "MULTIPLY"
     mix.inputs["Factor"].default_value = 0.25
@@ -227,7 +232,7 @@ def mat_tweak(name, rough=None, metallic=None):
 def setup_materials():
     have = {m.name for m in bpy.data.materials}
     if "brick" in have: mat_brick()
-    for name, col, rough in [("render", 0xe6c886, 0.78), ("trim", 0xf1e3c0, 0.72), ("stone", 0x9a958d, 0.85),
+    for name, col, rough in [("render", 0xd3b882, 0.78), ("trim", 0xe6d5ad, 0.72), ("groove", 0x9c8762, 0.9), ("stone", 0x9a958d, 0.85),
                              ("sandstone", 0xa4967b, 0.88), ("fedsq", 0xb99e78, 0.85),
                              ("bldg1", 0xd7d0c1, 0.8), ("bldg2", 0xc2b399, 0.85), ("bldg3", 0x9b9993, 0.8),
                              ("bldg4", 0xb47d5b, 0.88), ("bldg5", 0xe4e1da, 0.78)]:
@@ -250,12 +255,17 @@ def setup_materials():
         if name in have:
             mat_glass(name, {"paint1": 0x22324a, "paint2": 0xaeb3b8, "paint3": 0x7e2420}[name], 0.6, 0.2)
     mat_tweak("tram", 0.3, 0.0)
+    mat_tweak("mullion", 0.45, 0.3)
+    mat_tweak("columns", 0.35, 0.2)
+    mat_tweak("board", 0.4, 0.0)
 
 
 # ---------------------------------------------------------------------------
 
 def setup_world(sun_key):
     az, el, strength = SUNS[sun_key]
+    # Convert the compass azimuth to the model's grid (model north = -Z three.js = +Y here).
+    az = az + (90 - GRID_BEARING)
     scene = bpy.context.scene
     world = bpy.data.worlds.new("Sky")
     scene.world = world

@@ -166,7 +166,7 @@ button.primary { background: var(--verdigris); color: var(--on-accent); border-c
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { buildStation, PARTS } from './src/station.js';
+import { buildStation, PARTS, GRID_BEARING } from './src/station.js';
 
 const canvas = document.getElementById('view');
 const isSmall = matchMedia('(max-width: 640px)').matches;
@@ -208,9 +208,10 @@ const envSky = new Sky(); envSky.scale.setScalar(1000); envScene.add(envSky);
 let envRT = null;
 
 function setTime(h) {
-  // Melbourne in spring: sunrise in the east (+X), noon to the north (-Z).
+  // Melbourne in spring: sunrise in the east, noon to the north.
   const t = (h - 6.2) / (19.8 - 6.2);
-  const theta = Math.PI * THREE.MathUtils.clamp(t, 0, 1);
+  // theta: 0 = due east, PI/2 = due north; the model's grid is turned by GRID_BEARING.
+  const theta = Math.PI * THREE.MathUtils.clamp(t, 0, 1) - THREE.MathUtils.degToRad(90 - GRID_BEARING);
   const elev = THREE.MathUtils.degToRad(Math.max(1.5, 58 * Math.sin(theta)));
   const dir = new THREE.Vector3(Math.cos(theta) * Math.cos(elev), Math.sin(elev), -Math.sin(theta) * Math.cos(elev));
   skyU.sunPosition.value.copy(dir);
@@ -258,7 +259,7 @@ for (const key of order) {
 }
 
 // Floating labels above key places.
-const PIN_AT = { dome: [-13, 54, 13], clocktower: [-202, 63, 4], centre: [-110, 27, -1], stpauls: [75, 95, -65], fedsq: [70, 26, 40], platforms: [-150, 9, 70] };
+const PIN_AT = { dome: [-18, 52, 18], clocktower: [-190, 60, 3], centre: [-110, 32, -1], stpauls: [75, 95, -65], fedsq: [70, 26, 40], platforms: [-150, 9, 70] };
 const pinsEl = document.getElementById('pins');
 const pins = Object.entries(PIN_AT).map(([key, p]) => {
   const el = document.createElement('button');

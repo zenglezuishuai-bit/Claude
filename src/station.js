@@ -13,10 +13,15 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // Materials (viewer colours; Blender replaces these by name)
 
 export const MATERIALS = {
-  brick:     { color: 0xa8482c, roughness: 0.9 },
-  render:    { color: 0xe9cf8e, roughness: 0.8 },
-  trim:      { color: 0xf3e6c4, roughness: 0.75 },
-  copper:    { color: 0x5f9e86, roughness: 0.55, metalness: 0.3 },
+  brick:     { color: 0x9c3d27, roughness: 0.9 },
+  render:    { color: 0xd6bd8a, roughness: 0.8 },
+  trim:      { color: 0xe8d8b2, roughness: 0.75 },
+  groove:    { color: 0xa08b66, roughness: 0.9 },
+  mullion:   { color: 0x2e4636, roughness: 0.5 },
+  columns:   { color: 0x4d5862, roughness: 0.5 },
+  board:     { color: 0xe6c34a, roughness: 0.5 },
+  signboard: { color: 0x1f3a2c, roughness: 0.5 },
+  copper:    { color: 0x587f6a, roughness: 0.55, metalness: 0.3 },
   glass:     { color: 0x1d2a33, roughness: 0.15, metalness: 0.6 },
   roof:      { color: 0x55595c, roughness: 0.7, metalness: 0.2 },
   stone:     { color: 0x9a9690, roughness: 0.85 },
@@ -74,19 +79,19 @@ export const PARTS = {
   dome: {
     title: '主入口与铜穹顶',
     subtitle: 'Swanston St 转角',
-    text: '车站最具标志性的部分：巨大的拱形窗上方是绿色铜穹顶。入口台阶上方挂着一排时钟，"Under the clocks"（钟下见）是墨尔本人最常用的碰头暗号。',
-    view: { pos: [34, 20, -38], target: [-12, 16, 10] },
+    text: '入口斜对着 Flinders 与 Swanston 街口：大拱门里是站名招牌和一排显示各线下一班车的时钟，"Under the clocks"（钟下见）是墨尔本人最常用的碰头暗号。上方是带钟的三角山花，再往上是带肋的铜穹顶和灯笼亭，两侧角楼各有一个小铜穹顶。',
+    view: { pos: [30, 12, -30], target: [-14, 15, 12] },
   },
   clocktower: {
     title: '钟楼',
     subtitle: 'Elizabeth St 转角',
-    text: '位于车站西端的方形钟楼，四面都有钟面，顶部是铜质小穹顶，从 Elizabeth Street 一带远远就能看到。',
-    view: { pos: [-250, 40, -60], target: [-202, 34, 5] },
+    text: '红砖与米色抹灰相间的条纹钟楼，正对着 Elizabeth Street 的街轴。四面钟面之上是开敞的瞭望亭，四角立着方尖小塔，顶上是一座小穹顶。',
+    view: { pos: [-190, 24, -78], target: [-190, 34, 4] },
   },
   facade: {
     title: 'Flinders Street 立面',
-    subtitle: '红砖 + 奶油色抹灰带',
-    text: '主楼沿 Flinders Street 延伸约两百米，红砖墙面配奶油色水平抹灰带，底层是拱廊商铺，上层是成排的拱窗。顶层曾有一间舞厅，后来长期空置。',
+    subtitle: '红砖嵌板 + 米色抹灰墙柱',
+    text: '主楼沿 Flinders Street 延伸约 250 米。底层是一排弧拱商铺，上面三层窗嵌在红砖板里，墙柱是带横向分缝的米色抹灰，屋顶线是一整排栏杆，凸出的入口亭顶着弧形山墙或成对的小铜穹顶。顶层曾有一间舞厅，后来长期空置。',
     view: { pos: [-95, 22, -70], target: [-115, 10, 0] },
   },
   centre: {
@@ -99,7 +104,7 @@ export const PARTS = {
     title: '站台与雨棚',
     subtitle: '主楼南侧',
     text: '主楼背后是一排平行的站台，上方是钢结构雨棚，再往南就是亚拉河（Yarra River）。',
-    view: { pos: [-40, 45, 170], target: [-110, 2, 60] },
+    view: { pos: [-40, 70, 190], target: [-150, 2, 65] },
   },
   stpauls: {
     title: '圣保罗座堂',
@@ -123,7 +128,7 @@ export const PARTS = {
     title: 'Eureka Tower',
     subtitle: 'Southbank（河对岸）',
     text: '2006 年竣工的住宅塔楼，高约 297 米，顶部若干层窗户为镀金玻璃。（远景示意）',
-    view: { pos: [-60, 120, 60], target: [-160, 150, 330] },
+    view: { pos: [-60, 120, 40], target: [-160, 150, 300] },
   },
   city: {
     title: '周边街区',
@@ -189,7 +194,7 @@ class Frame {
     this.part = part;
     this.mat = new THREE.Matrix4()
       .makeTranslation(ox, 0, oz)
-      .multiply(new THREE.Matrix4().makeRotationY(FACING[facing]));
+      .multiply(new THREE.Matrix4().makeRotationY(typeof facing === 'number' ? facing : FACING[facing]));
   }
   add(mat, g, lx = 0, ly = 0, lz = 0) {
     g.translate(lx, ly, lz);
@@ -199,6 +204,13 @@ class Frame {
   box(mat, x0, x1, y0, y1, z0, z1) {
     const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
     this.add(mat, g, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  }
+  // The same frame pushed `dz` out of the wall, for elements on a projecting face.
+  offset(dz) {
+    const f = Object.create(Frame.prototype);
+    f.part = this.part;
+    f.mat = this.mat.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, dz));
+    return f;
   }
   // Arched (round-headed) window: glass with a projecting surround.
   arch(cx, y0, w, h, { t = 0.35, depth = 0.3, mat = 'trim', mullions = 0, transom = true, sill = true } = {}) {
@@ -285,327 +297,540 @@ function mulberry32(seed) {
 }
 
 // ---------------------------------------------------------------------------
-// Station constants
+// Station layout. Plan dimensions are measured from
+// reference/12-satellite-north-up.jpg (~0.47 m/px); heights are estimated from
+// the reference photographs. The model is aligned to the Hoddle grid: +X runs
+// along Flinders St, which really bears about 71° (ENE), so the viewer and the
+// Blender script rotate the sun by GRID_BEARING to keep shadows true.
+
+export const GRID_BEARING = 71;
 
 const ST = {
-  west: -207,      // west face (Elizabeth St)
-  domeW: 26,       // dome block footprint (square, NE corner at 0,0)
-  depth: 22,       // main block depth (south from facade)
-  eave: 15.2,      // main cornice height
-  bay: 4.3,
+  west: -252,       // west end of the Flinders St building
+  depth: 21,        // depth of the main block
+  eave: 20,         // main cornice height
+  block: 36,        // dome block footprint (square [-36,0] x [0,36]) ...
+  chamfer: 24,      // ... minus the corner cut facing the intersection
+  tower: -190,      // clock tower centre, on the Elizabeth St axis
+  river: 118,       // north bank of the Yarra
 };
 
+// Segmental arch: straight jambs to `ys`, then an arc of the given rise.
+function segArchShape(Cls, cx, y0, w, ys, rise) {
+  const s = new Cls();
+  const r = w / 2;
+  const R = (rise * rise + r * r) / (2 * rise);
+  const cy = ys + rise - R;
+  const a0 = Math.atan2(ys - cy, r);
+  s.moveTo(cx - r, y0);
+  s.lineTo(cx + r, y0);
+  s.lineTo(cx + r, ys);
+  s.absarc(cx, cy, R, a0, Math.PI - a0, false);
+  s.lineTo(cx - r, y0);
+  return s;
+}
+
+// Balustrade in a Frame: plinth, balusters, rail.
+function balustrade(f, a, b, y, z0 = 0, depth = 0.45, h = 1.15) {
+  f.box('trim', a, b, y, y + 0.22, z0, z0 + depth);
+  for (let x = a + 0.3; x < b - 0.15; x += 0.42) {
+    f.add('trim', new THREE.CylinderGeometry(0.08, 0.11, h - 0.45, 6), x, y + 0.22 + (h - 0.45) / 2, z0 + depth / 2);
+  }
+  f.box('trim', a, b, y + h - 0.23, y + h, z0 - 0.03, z0 + depth + 0.03);
+}
+
+// Horizontal rustication grooves on a face strip (local x a..b, y0..y1).
+function rusticate(f, a, b, y0, y1, z, step = 0.75) {
+  for (let y = y0 + step; y < y1 - 0.1; y += step) f.box('groove', a, b, y - 0.035, y + 0.035, z - 0.02, z + 0.015);
+}
+
+// Bulbous copper dome with a small lantern, at a world position.
+function onionDome(part, x, y, z, r, h) {
+  const prof = [[r, 0], [r * 1.07, h * 0.18], [r * 1.02, h * 0.38], [r * 0.8, h * 0.62], [r * 0.45, h * 0.84], [r * 0.12, h * 0.97], [0.01, h]];
+  part.add('copper', lathe(prof, 24).translate(x, y, z));
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const pts = prof.slice(0, 6).map(([pr, py]) => new THREE.Vector3(x + (pr + 0.04) * Math.cos(a), y + py, z + (pr + 0.04) * Math.sin(a)));
+    part.add('copper', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, r * 0.035, 5, false));
+  }
+  part.add('copper', new THREE.CylinderGeometry(r * 0.22, r * 0.26, h * 0.35, 8).translate(x, y + h + h * 0.15, z));
+  cupola(part, x, y + h + h * 0.32, z, r * 0.26, h * 0.22);
+}
+
 // ---------------------------------------------------------------------------
-// Main Flinders St facade (between clock tower and dome block)
+// Flinders St facade: arcade of segmental arches at street level, three
+// floors of windows in red brick panels between rusticated buff pilasters,
+// balustraded parapet, and projecting pavilions with shaped gables or paired
+// copper domes.
+
+const FEATURES = [
+  { c: -60, w: 14, kind: 'gable' },
+  { c: -110, w: 18, kind: 'centre' },
+  { c: -160, w: 14, kind: 'twin' },
+  { c: -190, w: 11, kind: 'tower' },   // clock tower, built separately
+  { c: -220, w: 14, kind: 'gable' },
+];
+
+function bay(f, a, b) {
+  const cx = (a + b) / 2;
+  const bw = b - a;
+  // Ground-floor arcade arch: shopfront below the transom, lunette above.
+  const w = bw - 2.2;
+  const ys = 4.3, rise = 2.1;
+  f.add('glass', new THREE.ShapeGeometry(segArchShape(THREE.Shape, cx, 0.9, w, ys, rise), 10), 0, 0, 0.04);
+  const outer = segArchShape(THREE.Shape, cx, 0.9, w + 1.2, ys, rise + 0.75);
+  outer.holes.push(segArchShape(THREE.Path, cx, 0.9, w, ys, rise));
+  f.add('render', new THREE.ExtrudeGeometry(outer, { depth: 0.4, bevelEnabled: false, curveSegments: 12 }));
+  f.box('trim', cx - 0.45, cx + 0.45, ys + rise - 0.3, ys + rise + 1.0, 0, 0.55);
+  f.box('mullion', cx - w / 2, cx + w / 2, ys - 0.08, ys + 0.08, 0, 0.12);
+  for (let i = 1; i < 4; i++) f.box('mullion', cx - w / 2 + (w * i) / 4 - 0.06, cx - w / 2 + (w * i) / 4 + 0.06, 0.9, ys + rise * 0.8, 0, 0.1);
+  // Brick panel windows: two floors of rectangular windows, arched on top.
+  const n = 3;
+  const sp = (bw - 2.4) / n;
+  for (let i = 0; i < n; i++) {
+    const x = a + 1.2 + sp * (i + 0.5);
+    f.rectWindow(x, 8.5, 1.25, 2.5, { t: 0.22, depth: 0.22 });
+    f.rectWindow(x, 12.6, 1.25, 2.4, { t: 0.22, depth: 0.22 });
+    f.arch(x, 16.4, 1.15, 2.3, { t: 0.22, transom: false });
+  }
+}
+
+function pilaster(f, x, y0, y1, w = 1.5, d = 0.4) {
+  f.box('render', x - w / 2, x + w / 2, y0, y1, 0, d);
+  rusticate(f, x - w / 2, x + w / 2, y0, y1, d);
+}
+
+function pavilion(f, pv, a, b) {
+  const E = ST.eave;
+  const w = b - a, mid = (a + b) / 2, P = 1.2;
+  const top = pv.kind === 'centre' ? E + 4 : E + 2.5;
+  f.box('brick', a, b, 0, top, 0, P);
+  // Corner pilasters and a central pair.
+  for (const x of [a + 0.9, b - 0.9]) { f.box('render', x - 0.9, x + 0.9, 0, top, 0, P + 0.4); rusticate(f, x - 0.9, x + 0.9, 0, top, P + 0.4); }
+  f.box('trim', a - 0.3, b + 0.3, 7.2, 7.8, 0, P + 0.55);
+  f.box('trim', a - 0.2, b + 0.2, 11.6, 12.0, 0, P + 0.4);
+  f.box('trim', a - 0.2, b + 0.2, 15.6, 16.0, 0, P + 0.4);
+  f.box('trim', a - 0.5, b + 0.5, top - 0.7, top, 0, P + 0.8);
+  const g = f.offset(P);
+  if (pv.kind === 'centre') {
+    // Degraves St entrance: tall round arch, windows grouped above.
+    g.box('stone', mid - 5.5, mid + 5.5, 0, 0.45, 0, 3.2);
+    g.arch(mid, 0.45, 6.4, 8.6, { t: 0.8, depth: 0.6, mat: 'render', transom: true, mullions: 2, sill: false });
+    for (const dx of [-5, 5]) g.arch(mid + dx, 1.0, 1.6, 4.2, { t: 0.3, sill: false });
+    for (const dx of [-3.4, 0, 3.4]) g.arch(mid + dx, 12.4, 1.4, 3.2, { t: 0.25 });
+    for (const dx of [-3.4, 0, 3.4]) g.arch(mid + dx, 16.8, 1.3, 2.6, { t: 0.22 });
+  } else {
+    g.arch(mid, 0.9, w - 5, 5.6, { t: 0.5, depth: 0.4, mat: 'render', mullions: 2, sill: false });
+    for (const dx of [-2.6, 0, 2.6]) g.rectWindow(mid + dx, 8.5, 1.3, 2.5);
+    for (const dx of [-2.6, 2.6]) g.rectWindow(mid + dx, 12.6, 1.3, 2.4);
+    g.arch(mid, 12.4, 2.0, 3.2, { t: 0.3, mullions: 1 });
+    for (const dx of [-2.6, 0, 2.6]) g.arch(mid + dx, 16.6, 1.2, 2.4, { t: 0.22, transom: false });
+  }
+  // Top: shaped gable, or a pair of turrets with copper domes.
+  if (pv.kind === 'gable' || pv.kind === 'centre') {
+    curvedGable(f, mid, top, w * 0.72, w * 0.36, 'render', 1.2);
+    f.add('trim', new THREE.CircleGeometry(1.15, 24), mid, top + w * 0.14, 1.31);
+    f.add('glass', new THREE.CircleGeometry(0.85, 24), mid, top + w * 0.14, 1.33);
+    for (const x of [mid - w * 0.36, mid + w * 0.36]) f.add('trim', new THREE.ConeGeometry(0.35, 2.2, 6), x, top + 1.1, 0.6);
+  }
+  if (pv.kind === 'twin' || pv.kind === 'centre') {
+    for (const x of [a + 1.6, b - 1.6]) {
+      f.box('render', x - 1.5, x + 1.5, top, top + 2.4, -1.6, 1.4);
+      f.box('trim', x - 1.7, x + 1.7, top + 2.4, top + 2.8, -1.8, 1.6);
+      const v = new THREE.Vector3(x, 0, -0.1).applyMatrix4(f.mat);
+      onionDome(f.part, v.x, top + 2.8, v.z, 1.55, 3.0);
+    }
+  }
+  balustrade(f, a + 1.8, b - 1.8, top, 0.3);
+}
 
 function buildFacade(parts) {
   const P = parts.facade;
-  const C = parts.centre;
-  const x0 = ST.west + 10;      // east face of clock tower
-  const x1 = -ST.domeW;         // west face of dome block
-  const L = x1 - x0;
+  const E = ST.eave;
+  const x1 = -ST.block;          // east end of the long facade
+  const x0 = ST.west + 16;        // west end pavilion begins here
+  P.box('brick', x0 - 0.01, x1, 0, E, 0, ST.depth);
+  hippedRoof(P, x0 + 1, x1 - 1, E + 1.2, 4.2, 1, ST.depth - 1);
+  for (const y of [7.2, 11.6, 15.6]) P.box('render', x0, x1, y, y + 0.4, ST.depth - 0.01, ST.depth + 0.15);
 
-  // Core massing and roof.
-  P.box('brick', x0, x1, 0, ST.eave, 0, ST.depth);
-  P.box('roof', x0 + 0.5, x1 - 0.5, ST.eave, ST.eave + 0.2, 0.5, ST.depth - 0.5);
-  {
-    // Hipped roof behind the parapet.
-    const g = new THREE.CylinderGeometry(0.01, 1, 1, 4, 1).rotateY(Math.PI / 4);
-    // After the 45° turn the base is a square of half-size SQRT1_2.
-    g.scale((L * 0.98) / 2 / Math.SQRT1_2, 4, (ST.depth - 2) / 2 / Math.SQRT1_2);
-    g.translate((x0 + x1) / 2, ST.eave + 2.2, ST.depth / 2);
-    P.add('roof', g);
-  }
-  // Rear wall gets a few banding lines too.
-  for (const y of [5.5, 10.4]) P.box('render', x0, x1, y, y + 0.45, ST.depth - 0.01, ST.depth + 0.15);
-
-  // Facade along north face: local x runs west from x1, so lx = x1 - worldX.
+  const lx = (wx) => x1 - wx;
+  const L = lx(x0);
   const f = new Frame(P, x1, 0, 'north');
-  const fc = new Frame(C, x1, 0, 'north');
+  const fc = new Frame(parts.centre, x1, 0, 'north');
 
-  // Pavilions (local x ranges); the central one is the Degraves St entrance.
-  const centreMid = x1 - -110;           // world x = -110
-  const pavilions = [
-    { a: 26, b: 38, h: 19.5 },
-    { a: centreMid - 9, b: centreMid + 9, h: 22, centre: true },
-    { a: L - 40, b: L - 28, h: 19.5 },
-  ];
-  const inPav = (lx) => pavilions.find((p) => lx > p.a - 0.6 && lx < p.b + 0.6);
+  // Continuous horizontal elements.
+  f.box('stone', 0, L, 0, 0.9, 0, 0.45);
+  f.box('trim', 0, L, 7.2, 7.8, 0, 0.55);
+  f.box('trim', 0, L, 11.6, 12.0, 0, 0.35);
+  f.box('trim', 0, L, 15.6, 16.0, 0, 0.35);
+  f.box('render', 0, L, E - 1.2, E - 0.6, 0, 0.3);
+  f.box('trim', 0, L, E - 0.6, E, 0, 0.85);
+  balustrade(f, 0, L, E, 0.1);
 
-  // Horizontal render banding over the brick (the "striped" look).
-  const bands = [];
-  for (let y = 1.2; y < ST.eave - 0.5; y += 1.25) bands.push(y);
-  for (const y of bands) f.box('render', 0, L, y, y + 0.32, 0, 0.06);
+  // Gaps between features are filled with ~10 m bays.
+  const feats = FEATURES.map((p) => ({ ...p, a: lx(p.c + p.w / 2), b: lx(p.c - p.w / 2) })).sort((p, q) => p.a - q.a);
+  let cur = 0;
+  const gaps = [];
+  for (const p of feats) { gaps.push([cur, p.a]); cur = p.b; }
+  gaps.push([cur, L]);
+  for (const [g0, g1] of gaps) {
+    const n = Math.max(1, Math.round((g1 - g0) / 10));
+    const bw = (g1 - g0) / n;
+    for (let i = 0; i < n; i++) bay(f, g0 + i * bw, g0 + (i + 1) * bw);
+    for (let i = 0; i <= n; i++) pilaster(f, g0 + i * bw, 0.9, E - 1.2);
+  }
+  for (const p of feats) if (p.kind !== 'tower') pavilion(p.kind === 'centre' ? fc : f, p, p.a, p.b);
 
-  // Plinth, string courses, cornice, parapet.
-  f.box('stone', 0, L, 0, 0.9, 0, 0.35);
-  f.box('trim', 0, L, 5.4, 5.95, 0, 0.45);
-  f.box('trim', 0, L, 10.3, 10.75, 0, 0.35);
-  f.box('trim', 0, L, ST.eave - 0.5, ST.eave, 0, 0.55);
-  f.box('trim', 0, L, ST.eave, ST.eave + 0.35, 0, 0.8);
-  f.box('render', 0, L, ST.eave + 0.35, ST.eave + 1.5, 0, 0.3);
-  f.box('trim', 0, L, ST.eave + 1.5, ST.eave + 1.75, 0, 0.42);
-
-  // Bays.
-  const nb = Math.floor(L / ST.bay);
-  const bay = L / nb;
-  for (let i = 0; i < nb; i++) {
-    const cx = (i + 0.5) * bay;
-    const pav = inPav(cx);
-    // Pilaster between bays.
-    if (i > 0) {
-      const px = i * bay;
-      f.box('render', px - 0.35, px + 0.35, 0.9, ST.eave - 0.5, 0, 0.25);
-    }
-    if (pav && pav.centre) continue; // central pavilion drawn separately
-    // Ground floor shop arches.
-    f.arch(cx, 0.9, bay - 1.3, 4.1, { t: 0.3, mullions: 1, sill: false });
-    // First floor: tall round-headed windows.
-    f.arch(cx, 6.5, 1.5, 3.2, { t: 0.28 });
-    // Second floor: shorter round-headed windows, paired.
-    f.arch(cx - 0.55, 11.3, 0.8, 2.4, { t: 0.2, transom: false });
-    f.arch(cx + 0.55, 11.3, 0.8, 2.4, { t: 0.2, transom: false });
-    // Parapet piers above pilasters.
-    f.box('trim', i * bay - 0.4, i * bay + 0.4, ST.eave + 0.35, ST.eave + 2.2, 0, 0.45);
+  // Street verandah on the shopfronts.
+  for (const [g0, g1] of gaps) {
+    f.box('canopy', g0 + 0.3, g1 - 0.3, 4.55, 4.75, 0.5, 3.6);
+    f.box('render', g0 + 0.3, g1 - 0.3, 4.75, 5.05, 3.4, 3.6);
   }
 
-  // Pavilions.
-  for (const pv of pavilions) {
-    const ff = pv.centre ? fc : f;
-    const w = pv.b - pv.a;
-    const mid = (pv.a + pv.b) / 2;
-    ff.box('brick', pv.a, pv.b, 0, pv.h, 0, 1.2);
-    for (let y = 1.2; y < pv.h - 1; y += 1.25) ff.box('render', pv.a, pv.b, y, y + 0.32, 1.2, 1.26);
-    ff.box('render', pv.a - 0.6, pv.a + 0.6, 0, pv.h, 0, 1.5);
-    ff.box('render', pv.b - 0.6, pv.b + 0.6, 0, pv.h, 0, 1.5);
-    ff.box('trim', pv.a - 0.7, pv.b + 0.7, pv.h - 0.6, pv.h, 0, 1.9);
-    ff.box('trim', pv.a - 0.4, pv.b + 0.4, 5.4, 5.95, 1.2, 1.7);
-    ff.box('trim', pv.a - 0.4, pv.b + 0.4, 10.3, 10.75, 1.2, 1.6);
-    curvedGable(ff, mid, pv.h, w * 0.75, w * 0.32, 'render', 1.2);
-    ff.add('trim', new THREE.CircleGeometry(1.1, 24), mid, pv.h + w * 0.13, 1.31);
-    ff.add('clockdark', new THREE.CircleGeometry(0.85, 24), mid, pv.h + w * 0.13, 1.33);
-    // Turrets flanking the gable.
-    for (const tx of [pv.a, pv.b]) {
-      ff.box('render', tx - 0.9, tx + 0.9, pv.h, pv.h + 2.6, -0.3, 1.5);
-      ff.box('trim', tx - 1.05, tx + 1.05, pv.h + 2.6, pv.h + 2.9, -0.45, 1.65);
-    }
-    if (pv.centre) {
-      // Big arched entrance and a tall arched window over it.
-      ff.box('stone', mid - 6, mid + 6, 0, 0.5, 1.2, 3.5);
-      ff.box('stone', mid - 5.5, mid + 5.5, 0.5, 0.9, 1.2, 2.6);
-      ff.arch(mid, 0.9, 7, 8.2, { t: 0.7, depth: 0.5, mullions: 0, mat: 'render', transom: false, sill: false });
-      ff.box('clockdark', mid - 3.5, mid + 3.5, 0.9, 5.2, 1.21, 1.3);
-      ff.arch(mid - 4.2, 11, 1.4, 3.6, { t: 0.25 });
-      ff.arch(mid + 4.2, 11, 1.4, 3.6, { t: 0.25 });
-      ff.arch(mid, 11, 2.6, 5.4, { t: 0.4, mullions: 1 });
-      ff.arch(mid - 4.2, 1.2, 1.4, 3.4, { t: 0.25 });
-      ff.arch(mid + 4.2, 1.2, 1.4, 3.4, { t: 0.25 });
-    } else {
-      ff.arch(mid, 0.9, 3.2, 4.2, { t: 0.35, mullions: 1, sill: false });
-      ff.arch(mid - 2.9, 6.5, 1.4, 3.2, { t: 0.25 });
-      ff.arch(mid, 6.5, 2.2, 3.6, { t: 0.3, mullions: 1 });
-      ff.arch(mid + 2.9, 6.5, 1.4, 3.2, { t: 0.25 });
-      ff.arch(mid - 2.5, 11.3, 1.1, 2.6, { t: 0.22 });
-      ff.arch(mid, 11.3, 1.6, 3.0, { t: 0.25 });
-      ff.arch(mid + 2.5, 11.3, 1.1, 2.6, { t: 0.22 });
-      ff.arch(mid, 15.8, 2.0, 2.4, { t: 0.25 });
-    }
-    // Copper caps on turrets (world coordinates).
-    for (const tx of [pv.a, pv.b]) {
-      const v = new THREE.Vector3(tx, 0, 0.6).applyMatrix4(ff.mat);
-      cupola(ff.part, v.x, pv.h + 2.9, v.z, 1.1, 1.8);
-    }
-  }
+  buildWestEnd(parts, x0);
+}
 
-  // Street verandah (cantilevered awning over the shops).
-  f.box('canopy', 0.5, L - 0.5, 4.75, 4.95, 0.45, 3.2);
-  f.box('trim', 0.5, L - 0.5, 4.95, 5.25, 3.0, 3.2);
+function hippedRoof(part, x0, x1, y, h, z0, z1) {
+  const g = new THREE.CylinderGeometry(0.01, 1, 1, 4, 1).rotateY(Math.PI / 4);
+  // After the 45° turn the base is a square of half-size SQRT1_2.
+  g.scale((x1 - x0) / 2 / Math.SQRT1_2, h, (z1 - z0) / 2 / Math.SQRT1_2);
+  g.translate((x0 + x1) / 2, y + h / 2, (z0 + z1) / 2);
+  part.add('slate', g);
+}
+
+// West end: corner pavilion with a copper dome on an octagonal drum.
+function buildWestEnd(parts, xe) {
+  const P = parts.facade;
+  const E = ST.eave;
+  const x0 = ST.west, z1 = ST.depth + 4;
+  P.box('brick', x0, xe, 0, E + 1, 0, z1);
+  hippedRoof(P, x0 + 1, xe - 1, E + 1.6, 3.5, 1, z1 - 1);
+  for (const [ox, oz, facing, w] of [[xe, 0, 'north', xe - x0], [x0, 0, 'west', z1]]) {
+    const f = new Frame(P, ox, oz, facing);
+    f.box('stone', 0, w, 0, 0.9, 0, 0.45);
+    f.box('trim', 0, w, 7.2, 7.8, 0, 0.55);
+    f.box('trim', 0, w, E + 0.4, E + 1.0, 0, 0.85);
+    const n = Math.round(w / 8);
+    for (let i = 0; i < n; i++) bay(f, (w * i) / n, (w * (i + 1)) / n);
+    for (let i = 0; i <= n; i++) pilaster(f, (w * i) / n, 0.9, E + 0.4);
+    balustrade(f, 0, w, E + 1.0, 0.1);
+  }
+  // Corner tower and dome at the north-west corner.
+  const cx = x0 + 4, cz = 4;
+  P.box('render', cx - 4.6, cx + 4.6, 0, E + 4, cz - 4.6, cz + 4.6);
+  for (const [ox, oz, facing] of [[cx + 4.6, cz - 4.6, 'north'], [cx - 4.6, cz - 4.6, 'west']]) {
+    const f = new Frame(P, ox, oz, facing);
+    rusticate(f, 0, 9.2, 0, E + 4, 0.02);
+    f.arch(4.6, 1.0, 2.6, 5.0, { t: 0.4, sill: false });
+    f.arch(4.6, 8.4, 1.8, 3.4, { t: 0.3 });
+    f.arch(4.6, 12.6, 1.8, 3.2, { t: 0.3 });
+    f.arch(4.6, 16.8, 1.6, 2.8, { t: 0.28 });
+  }
+  P.box('trim', cx - 5, cx + 5, E + 4, E + 4.6, cz - 5, cz + 5);
+  P.add('render', new THREE.CylinderGeometry(3.9, 4.1, 2.6, 8).rotateY(Math.PI / 8).translate(cx, E + 5.9, cz));
+  P.add('trim', new THREE.CylinderGeometry(4.3, 4.3, 0.35, 8).rotateY(Math.PI / 8).translate(cx, E + 7.35, cz));
+  onionDome(P, cx, E + 7.5, cz, 3.9, 5.6);
 }
 
 // ---------------------------------------------------------------------------
-// Dome block at the Flinders / Swanston corner
+// Dome block: a chamfered corner facing the Flinders/Swanston intersection.
 
 function buildDome(parts) {
   const P = parts.dome;
-  const W = ST.domeW;
-  const H = 23;
-  const cx = -W / 2, cz = W / 2;
+  const B = ST.block, K = ST.chamfer, H = 21;
 
-  P.box('brick', -W, 0, 0, H, 0, W);
-  // Corner piers (render), cornice, parapet.
-  for (const [x, z] of [[-W, 0], [0, 0], [-W, W], [0, W]]) {
-    P.box('render', x - 2.2, x + 2.2, 0, H + 1, z - 2.2, z + 2.2);
-    for (let y = 1.2; y < H; y += 1.25) P.box('trim', x - 2.3, x + 2.3, y, y + 0.32, z - 2.3, z + 2.3);
-    P.box('trim', x - 2.6, x + 2.6, H + 1, H + 1.5, z - 2.6, z + 2.6);
-    P.box('render', x - 1.8, x + 1.8, H + 1.5, H + 4.5, z - 1.8, z + 1.8);
-    P.box('trim', x - 2.0, x + 2.0, H + 4.5, H + 4.9, z - 2.0, z + 2.0);
-    cupola(P, x, H + 4.9, z, 1.7, 2.6);
-  }
-  P.box('trim', -W - 0.4, 0.4, H - 0.6, H, -0.4, W + 0.4);
-  P.box('render', -W, 0, H, H + 1.4, 0, W);
-  P.box('trim', -W - 0.3, 0.3, H + 1.4, H + 1.7, -0.3, W + 0.3);
-  P.box('roof', -W + 1, -1, H + 1.4, H + 2.2, 1, W - 1);
+  // Plan as an extruded shape (shape y = -world z).
+  const plan = new THREE.Shape();
+  plan.moveTo(-B, 0); plan.lineTo(-K, 0); plan.lineTo(0, -K); plan.lineTo(0, -B); plan.lineTo(-B, -B); plan.lineTo(-B, 0);
+  P.add('render', new THREE.ExtrudeGeometry(plan, { depth: H, bevelEnabled: false }).rotateX(-Math.PI / 2));
+  P.add('roof', new THREE.ExtrudeGeometry(plan, { depth: 0.3, bevelEnabled: false }).rotateX(-Math.PI / 2).scale(0.96, 1, 0.96).translate(-0.7, H, 0.7));
 
-  // The two street faces: north (Flinders) and east (Swanston).
-  const faces = [new Frame(P, 0, 0, 'north'), new Frame(P, 0, W, 'east')];
-  for (const f of faces) {
-    const mid = W / 2;
-    for (let y = 1.2; y < H - 1; y += 1.25) f.box('render', 2.2, W - 2.2, y, y + 0.32, 0, 0.06);
-    f.box('stone', 0, W, 0, 1.0, 0, 0.4);
-    // Steps up to the entrance.
-    for (let s = 0; s < 4; s++) f.box('stone', mid - 9 + s * 0.3, mid + 9 - s * 0.3, s * 0.2, (s + 1) * 0.2, 0, 3.4 - s * 0.6);
-    // Giant arched window with radiating glazing bars.
-    const aw = 14, ay = 6.2, ah = 15.6;
-    f.arch(mid, ay, aw, ah, { t: 1.3, depth: 0.9, mat: 'render', mullions: 5, transom: true, sill: false });
-    f.box('trim', mid - aw / 2, mid + aw / 2, ay + 3.4, ay + 3.6, 0, 0.14);
-    // Archivolt keystone.
-    f.box('trim', mid - 0.8, mid + 0.8, ay + ah - 0.2, ay + ah + 1.6, 0, 1.2);
-    // Entrance openings below the arch.
-    for (const dx of [-4.7, 0, 4.7]) f.arch(mid + dx, 0.8, 3.4, 4.6, { t: 0.4, depth: 0.5, mat: 'render', transom: false, sill: false });
-    // The famous row of clocks above the entrance.
-    for (let k = 0; k < 9; k++) {
-      const x = mid - 5.6 + k * 1.4;
-      f.box('clockdark', x - 0.62, x + 0.62, 5.55, 6.0, 0.35, 0.55);
-      f.clock(x, 5.2, 0.42, 0.5);
-    }
-    // Side windows beside the arch.
-    for (const dx of [-9.6, 9.6]) {
-      f.arch(mid + dx, 7, 1.6, 3.6, { t: 0.3 });
-      f.arch(mid + dx, 13, 1.6, 3.6, { t: 0.3 });
-      f.rectWindow(mid + dx, 18.6, 1.6, 2.2);
-      f.arch(mid + dx, 1.4, 1.8, 3.2, { t: 0.3, sill: false });
-    }
-    f.box('trim', 0, W, H - 3, H - 2.6, 0, 0.4);
+  // Entrance face, seen from the intersection: local x runs from the
+  // Swanston St end (0, K) to the Flinders St end (-K, 0).
+  const Wf = K * Math.SQRT2;
+  const mid = Wf / 2;
+  const f = new Frame(P, 0, K, (3 * Math.PI) / 4);
+
+  // Corner towers with copper domes.
+  for (const [a, b] of [[0, 6.2], [Wf - 6.2, Wf]]) {
+    const c = (a + b) / 2;
+    f.box('render', a, b, 0, H + 1.6, -6, 1.0);
+    rusticate(f, a, b, 0.9, H + 1.6, 1.0);
+    f.box('stone', a - 0.2, b + 0.2, 0, 0.9, -6, 1.3);
+    const tf = f.offset(1.0);
+    tf.arch(c, 0.9, 2.4, 4.4, { t: 0.4, sill: false });
+    tf.arch(c, 8.4, 1.7, 3.6, { t: 0.32 });
+    tf.rectWindow(c, 13.2, 1.6, 2.4, { t: 0.26 });
+    tf.arch(c, 17.0, 1.4, 2.4, { t: 0.26 });
+    f.box('trim', a - 0.4, b + 0.4, H + 1.6, H + 2.2, -6.4, 1.5);
+    f.box('render', a + 0.5, b - 0.5, H + 2.2, H + 4.2, -5.5, 0.6);
+    f.box('trim', a + 0.3, b - 0.3, H + 4.2, H + 4.6, -5.7, 0.8);
+    const v = new THREE.Vector3(c, 0, -2.5).applyMatrix4(f.mat);
+    onionDome(P, v.x, H + 4.6, v.z, 2.6, 4.4);
   }
 
-  // Drum, dome and lantern.
-  const y0 = H + 1.4;
-  P.add('render', new THREE.CylinderGeometry(10.2, 10.6, 2.2, 48).translate(cx, y0 + 1.1, cz));
-  P.add('trim', new THREE.CylinderGeometry(10.9, 10.9, 0.4, 48).translate(cx, y0 + 2.4, cz));
-  P.add('render', new THREE.CylinderGeometry(9.3, 9.3, 5.4, 48).translate(cx, y0 + 5.1, cz));
-  // Drum windows and pilasters.
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
+  // Central frontispiece between the towers.
+  const c0 = 6.2, c1 = Wf - 6.2;
+  // Side bays: brick panels with doors and arched windows.
+  for (const [a, b] of [[c0, c0 + 5.2], [c1 - 5.2, c1]]) {
+    const c = (a + b) / 2;
+    f.box('brick', a + 0.6, b - 0.6, 6.8, 16.2, 0, 0.06);
+    f.arch(c, 0.9, 2.6, 4.6, { t: 0.42, depth: 0.45, sill: false });
+    f.arch(c, 7.6, 2.2, 4.0, { t: 0.36, depth: 0.4 });
+    f.rectWindow(c, 13.0, 2.0, 2.6, { t: 0.3, depth: 0.35 });
+    f.box('render', a, a + 0.6, 0, 17.6, 0, 0.3);
+    f.box('render', b - 0.6, b, 0, 17.6, 0, 0.3);
+  }
+  rusticate(f, c0, c1, 0.9, 16.2, 0.02, 0.7);
+
+  // Steps up to the entrance.
+  for (let s = 0; s < 5; s++) f.box('stone', mid - 9 + s * 0.25, mid + 9 - s * 0.25, s * 0.18, (s + 1) * 0.18, 0.6, 5.0 - s * 0.8);
+
+  // The great arch: glazed lunette, sign, row of clocks, line boards.
+  const aw = 11.6, ay = 0.9, spring = 6.0;
+  const ah = spring - ay + aw / 2;
+  f.add('glass', new THREE.ShapeGeometry(archShape(THREE.Shape, mid, ay, aw, ah), 16), 0, 0, 0.1);
+  const arch = archShape(THREE.Shape, mid, ay, aw + 2.8, ah + 1.4);
+  arch.holes.push(archShape(THREE.Path, mid, ay, aw, ah));
+  f.add('render', new THREE.ExtrudeGeometry(arch, { depth: 1.1, bevelEnabled: false, curveSegments: 20 }));
+  for (let i = 0; i <= 14; i++) {
+    const t = (i / 14) * Math.PI;
+    const g = new THREE.BoxGeometry(0.07, 1.4, 0.06).translate(0, aw / 2 + 0.7, 0).rotateZ(t - Math.PI / 2);
+    f.add('groove', g, mid, spring, 1.11);
+  }
+  f.box('trim', mid - 0.8, mid + 0.8, spring + aw / 2 - 0.2, spring + aw / 2 + 1.6, 0, 1.4);
+  f.box('clockdark', mid - aw / 2, mid + aw / 2, ay, 3.2, -0.6, 0.12);
+  f.box('board', mid - aw / 2 + 0.2, mid + aw / 2 - 0.2, 3.2, 3.85, 0.1, 0.3);
+  for (let k = 0; k < 9; k++) {
+    const x = mid - 4.8 + k * 1.2;
+    f.box('board', x - 0.42, x + 0.42, 3.3, 3.75, 0.3, 0.33);
+    f.clock(x, 4.35, 0.34, 0.2);
+  }
+  f.box('signboard', mid - aw / 2, mid + aw / 2, 4.85, 5.65, 0.1, 0.35);
+  for (let k = 0; k < 21; k++) {
+    if (k === 7 || k === 14) continue;
+    const x = mid - 4.4 + k * 0.44;
+    f.box('board', x - 0.13, x + 0.13, 5.0, 5.5, 0.35, 0.38);
+  }
+  f.box('mullion', mid - aw / 2, mid + aw / 2, spring - 0.1, spring + 0.1, 0.1, 0.25);
+  for (let k = 1; k < 8; k++) {
+    const x = mid - aw / 2 + (aw * k) / 8;
+    const top = spring + Math.sqrt(Math.max(0, (aw / 2) ** 2 - (x - mid) ** 2));
+    f.add('trim', new THREE.CylinderGeometry(0.11, 0.14, top - spring, 8), x, (spring + top) / 2, 0.3);
+  }
+  for (let k = 1; k < 4; k++) {
+    const y = spring + (k * aw) / 2 / 4;
+    const hw = Math.sqrt(Math.max(0, (aw / 2) ** 2 - (y - spring) ** 2));
+    f.box('mullion', mid - hw, mid + hw, y - 0.05, y + 0.05, 0.1, 0.18);
+  }
+
+  // Above the arch: a row of six windows between columns, cornice, pediment.
+  f.box('trim', c0, c1, 12.2, 12.8, 0, 1.0);
+  for (let k = 0; k < 6; k++) {
+    const x = mid - 4.5 + k * 1.8;
+    f.box('glass', x - 0.55, x + 0.55, 13.2, 15.8, 0.02, 0.08);
+    f.box('mullion', x - 0.04, x + 0.04, 13.2, 15.8, 0.02, 0.12);
+  }
+  for (let k = 0; k <= 6; k++) {
+    const x = mid - 5.4 + k * 1.8;
+    f.add('columns', new THREE.CylinderGeometry(0.24, 0.27, 2.8, 12), x, 14.6, 0.95);
+  }
+  f.box('render', c0, c1, 16.2, 17.6, 0, 1.1);
+  f.box('trim', c0 - 0.3, c1 + 0.3, 17.6, 18.2, -0.2, 1.4);
+  const ped = new THREE.Shape();
+  ped.moveTo(mid - 8.6, 0); ped.lineTo(mid + 8.6, 0); ped.lineTo(mid, 5.0); ped.lineTo(mid - 8.6, 0);
+  f.add('render', new THREE.ExtrudeGeometry(ped, { depth: 1.0, bevelEnabled: false }), 0, 18.2, 0);
+  const slope = Math.atan2(5.0, 8.6), rl = Math.hypot(8.6, 5.0) + 0.9;
+  for (const s of [-1, 1]) {
+    const g = new THREE.BoxGeometry(rl, 0.55, 1.5).rotateZ(-s * slope);
+    f.add('trim', g, mid + s * 4.3, 18.2 + 2.5 + 0.3, 0.5);
+  }
+  f.add('trim', new THREE.CircleGeometry(1.55, 32), mid, 19.9, 1.02);
+  f.clock(mid, 19.9, 1.05, 1.03);
+  balustrade(f, c0, c0 + 4.5, 18.2, 0);
+  balustrade(f, c1 - 4.5, c1, 18.2, 0);
+
+  // Short return faces on Flinders St and Swanston St.
+  for (const [ox, oz, facing] of [[-K, 0, 'north'], [0, B, 'east']]) {
+    const r = new Frame(P, ox, oz, facing);
+    const w = B - K;
+    r.box('stone', 0, w, 0, 0.9, 0, 0.4);
+    rusticate(r, 0, w, 0.9, H, 0.02);
+    r.box('brick', 1.4, w - 1.4, 6.6, 17.6, 0.02, 0.08);
+    r.arch(w / 2, 0.9, 3.0, 4.8, { t: 0.45, sill: false });
+    r.arch(w / 2, 7.4, 2.6, 4.4, { t: 0.4 });
+    r.arch(w / 2, 13.0, 2.4, 3.8, { t: 0.36 });
+    r.box('trim', 0, w, H - 0.6, H, 0, 0.8);
+    balustrade(r, 0, w, H, 0.1);
+  }
+
+  // Drum with oculi, ribbed copper dome with dormers, lantern and flagpole.
+  const cx = -18, cz = 18, y0 = H + 0.3;
+  P.add('render', new THREE.CylinderGeometry(9.4, 9.7, 1.0, 48).translate(cx, y0 + 0.5, cz));
+  P.add('render', new THREE.CylinderGeometry(8.8, 8.8, 2.6, 48).translate(cx, y0 + 2.3, cz));
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     const ry = -a + Math.PI / 2;
-    const win = archShape(THREE.Shape, 0, 0, 1.7, 3.3);
-    const g = new THREE.ShapeGeometry(win, 8).translate(0, 0, 9.33).rotateY(ry);
-    P.add('glass', g.translate(cx, y0 + 3.4, cz));
-    const pa = a + Math.PI / 12;
-    P.add('trim', new THREE.BoxGeometry(0.7, 5.4, 0.5).translate(0, 0, 9.4).rotateY(-pa + Math.PI / 2).translate(cx, y0 + 5.1, cz));
+    P.add('trim', new THREE.TorusGeometry(0.7, 0.18, 6, 20).translate(0, 0, 8.85).rotateY(ry).translate(cx, y0 + 2.3, cz));
+    P.add('glass', new THREE.CircleGeometry(0.7, 20).translate(0, 0, 8.83).rotateY(ry).translate(cx, y0 + 2.3, cz));
+    const pa = a + Math.PI / 8;
+    P.add('trim', new THREE.BoxGeometry(0.8, 2.6, 0.5).translate(0, 0, 8.9).rotateY(-pa + Math.PI / 2).translate(cx, y0 + 2.3, cz));
   }
-  P.add('trim', new THREE.CylinderGeometry(9.9, 9.9, 0.6, 48).translate(cx, y0 + 8.1, cz));
-  const dY = y0 + 8.4;
-  P.add('copper', lathe(domeProfile(9.4, 11.5, 24), 64).translate(cx, dY, cz));
-  // Ribs.
+  P.add('trim', new THREE.CylinderGeometry(9.5, 9.3, 0.6, 48).translate(cx, y0 + 3.9, cz));
+  const dY = y0 + 4.2;
+  const R = 9.2, DH = 11.2;
+  const prof = [];
+  for (let i = 0; i <= 24; i++) {
+    const t = (i / 24) * (Math.PI / 2);
+    prof.push([Math.max(R * Math.cos(t) ** 0.85, 0.01), DH * Math.sin(t)]);
+  }
+  P.add('copper', lathe(prof, 64).translate(cx, dY, cz));
   for (let i = 0; i < 16; i++) {
     const a = (i / 16) * Math.PI * 2;
-    const pts = [];
-    for (let k = 0; k <= 12; k++) {
-      const t = (k / 12) * (Math.PI / 2) * 0.93;
-      const r = 9.4 * Math.cos(t) + 0.12;
-      pts.push(new THREE.Vector3(cx + r * Math.cos(a), dY + 11.5 * Math.sin(t) + 0.05, cz + r * Math.sin(a)));
-    }
-    P.add('copper', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.16, 6, false));
+    const pts = prof.slice(0, 22).map(([pr, py]) => new THREE.Vector3(cx + (pr + 0.1) * Math.cos(a), dY + py, cz + (pr + 0.1) * Math.sin(a)));
+    P.add('copper', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.17, 6, false));
   }
-  // Lantern.
-  const lY = dY + 11.2;
-  P.add('trim', new THREE.CylinderGeometry(2.2, 2.4, 0.5, 24).translate(cx, lY + 0.25, cz));
-  P.add('render', new THREE.CylinderGeometry(1.8, 1.8, 3.2, 24).translate(cx, lY + 2.1, cz));
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const ry = -a + Math.PI / 2;
+    P.add('copper', new THREE.CylinderGeometry(1.25, 1.25, 1.4, 20, 1, false, 0, Math.PI).rotateX(Math.PI / 2).translate(0, 0, 8.4).rotateY(ry).translate(cx, dY + 2.2, cz));
+    P.add('trim', new THREE.TorusGeometry(0.75, 0.16, 6, 18).translate(0, 0, 9.15).rotateY(ry).translate(cx, dY + 2.0, cz));
+    P.add('glass', new THREE.CircleGeometry(0.75, 18).translate(0, 0, 9.1).rotateY(ry).translate(cx, dY + 2.0, cz));
+  }
+  const lY = dY + DH - 0.4;
+  P.add('copper', new THREE.CylinderGeometry(1.9, 2.2, 0.5, 16).translate(cx, lY + 0.25, cz));
+  P.add('copper', new THREE.CylinderGeometry(1.45, 1.45, 2.6, 8).rotateY(Math.PI / 8).translate(cx, lY + 1.8, cz));
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
-    const g = new THREE.ShapeGeometry(archShape(THREE.Shape, 0, 0, 0.7, 2.0), 6).translate(0, 0, 1.82).rotateY(-a + Math.PI / 2);
-    P.add('glass', g.translate(cx, lY + 0.9, cz));
+    P.add('glass', new THREE.ShapeGeometry(archShape(THREE.Shape, 0, 0, 0.6, 1.7), 6).translate(0, 0, 1.37).rotateY(-a + Math.PI / 2).translate(cx, lY + 0.8, cz));
   }
-  P.add('trim', new THREE.CylinderGeometry(2.1, 2.1, 0.35, 24).translate(cx, lY + 3.8, cz));
-  cupola(P, cx, lY + 3.95, cz, 1.9, 2.4);
+  P.add('copper', new THREE.CylinderGeometry(1.75, 1.75, 0.3, 16).translate(cx, lY + 3.25, cz));
+  cupola(P, cx, lY + 3.4, cz, 1.5, 1.9, { finial: false });
+  P.add('rail', new THREE.CylinderGeometry(0.06, 0.09, 7, 6).translate(cx, lY + 8.6, cz));
 }
 
 // ---------------------------------------------------------------------------
-// Clock tower at the Elizabeth St end
+// Clock tower: banded red brick and cream render, clock stage, open
+// belvedere with obelisk pinnacles, small dome.
 
 function buildClockTower(parts) {
   const P = parts.clocktower;
-  const x0 = ST.west, x1 = ST.west + 10, z0 = -0.8, z1 = 9.2;
-  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  const shaft = 40;
+  const w = 9.6, cx = ST.tower, x0 = cx - w / 2, x1 = cx + w / 2, z0 = -1.2, z1 = z0 + w;
+  const cz = (z0 + z1) / 2;
+  const shaft = 34;
 
   P.box('brick', x0, x1, 0, shaft, z0, z1);
-  // Quoins at the corners and render banding.
-  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) P.box('render', x - 0.7, x + 0.7, 0, shaft, z - 0.7, z + 0.7);
-  for (let y = 1.2; y < shaft; y += 1.25) P.box('render', x0 - 0.05, x1 + 0.05, y, y + 0.32, z0 - 0.05, z1 + 0.05);
-  P.box('stone', x0 - 0.8, x1 + 0.8, 0, 1.0, z0 - 0.8, z1 + 0.8);
+  for (let y = 1.3; y < shaft - 0.5; y += 1.35) P.box('render', x0 - 0.05, x1 + 0.05, y, y + 0.55, z0 - 0.05, z1 + 0.05);
+  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
+    P.box('render', x - 0.75, x + 0.75, 0, shaft, z - 0.75, z + 0.75);
+  }
+  P.box('stone', x0 - 0.9, x1 + 0.9, 0, 1.0, z0 - 0.9, z1 + 0.9);
 
   for (const [ox, oz, facing] of [[x1, z0, 'north'], [x0, z0, 'west'], [x0, z1, 'south'], [x1, z1, 'east']]) {
     const f = new Frame(P, ox, oz, facing);
-    // Entrance arch on the north and west faces, windows above.
-    if (facing === 'north' || facing === 'west') f.arch(5, 1.0, 4.2, 6.2, { t: 0.6, depth: 0.5, mat: 'render', transom: false, sill: false });
-    else f.arch(5, 2.5, 1.8, 3.6, { t: 0.3 });
-    for (const y of [9, 15, 21, 27]) f.arch(5, y, 1.6, 3.8, { t: 0.3 });
-    f.box('trim', -0.8, 10.8, 5.6, 6.1, 0, 0.5);
-    f.box('trim', -0.8, 10.8, 32, 32.5, 0, 0.5);
-    f.arch(3.2, 33.6, 1.1, 3.4, { t: 0.25, transom: false });
-    f.arch(6.8, 33.6, 1.1, 3.4, { t: 0.25, transom: false });
+    if (facing === 'north') f.arch(w / 2, 1.0, 4.6, 7.0, { t: 0.7, depth: 0.6, mat: 'render', transom: true, mullions: 2, sill: false });
+    for (const y of [22.2, 26.4]) { f.arch(w / 2 - 1.1, y, 1.0, 2.8, { t: 0.22, transom: false }); f.arch(w / 2 + 1.1, y, 1.0, 2.8, { t: 0.22, transom: false }); }
+    f.box('trim', -0.9, w + 0.9, 20.0, 20.6, 0, 0.7);
+    f.box('trim', -0.9, w + 0.9, 30.4, 30.9, 0, 0.6);
+    for (let k = 0; k < 4; k++) f.arch(w / 2 - 2.4 + k * 1.6, 31.2, 0.7, 2.2, { t: 0.15, transom: false, sill: false });
   }
-  P.box('trim', x0 - 1.0, x1 + 1.0, shaft, shaft + 0.8, z0 - 1.0, z1 + 1.0);
+  P.box('trim', x0 - 1.0, x1 + 1.0, shaft, shaft + 0.7, z0 - 1.0, z1 + 1.0);
 
   // Clock stage.
-  const cy0 = shaft + 0.8;
-  P.box('render', x0 + 0.3, x1 - 0.3, cy0, cy0 + 7, z0 + 0.3, z1 - 0.3);
-  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
-    P.box('trim', x - 0.3, x + 0.3, cy0, cy0 + 7, z - 0.3, z + 0.3);
-  }
-  for (const [ox, oz, facing] of [[x1 - 0.3, z0 + 0.3, 'north'], [x0 + 0.3, z0 + 0.3, 'west'], [x0 + 0.3, z1 - 0.3, 'south'], [x1 - 0.3, z1 - 0.3, 'east']]) {
+  const c0 = shaft + 0.7;
+  P.box('render', x0 + 0.2, x1 - 0.2, c0, c0 + 6.6, z0 + 0.2, z1 - 0.2);
+  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) P.box('trim', x - 0.15, x + 0.75, c0, c0 + 6.6, z - 0.15, z + 0.75);
+  for (const [ox, oz, facing] of [[x1 - 0.2, z0 + 0.2, 'north'], [x0 + 0.2, z0 + 0.2, 'west'], [x0 + 0.2, z1 - 0.2, 'south'], [x1 - 0.2, z1 - 0.2, 'east']]) {
     const f = new Frame(P, ox, oz, facing);
-    f.clock(4.7, cy0 + 3.5, 2.6, 0.05);
-    curvedGable(f, 4.7, cy0 + 7, 7.4, 2.4, 'render', 0.9);
+    f.add('trim', new THREE.CircleGeometry(2.55, 40), (w - 0.4) / 2, c0 + 3.3, 0.02);
+    f.clock((w - 0.4) / 2, c0 + 3.3, 1.95, 0.04);
+    curvedGable(f, (w - 0.4) / 2, c0 + 6.6, 6.4, 1.8, 'render', 0.8);
   }
-  P.box('trim', x0 - 0.6, x1 + 0.6, cy0 + 7, cy0 + 7.6, z0 - 0.6, z1 + 0.6);
-  // Copper cupola and lantern.
-  const tY = cy0 + 7.6;
-  P.add('render', new THREE.CylinderGeometry(3.8, 4.2, 1.6, 8).rotateY(Math.PI / 8).translate(cx, tY + 0.8, cz));
-  P.add('copper', lathe(domeProfile(4.0, 5.2), 8).rotateY(Math.PI / 8).translate(cx, tY + 1.6, cz));
-  P.add('render', new THREE.CylinderGeometry(1.0, 1.0, 2.0, 12).translate(cx, tY + 7.4, cz));
-  cupola(P, cx, tY + 8.4, cz, 1.2, 1.8);
-  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) cupola(P, x, cy0 + 7.6, z, 0.9, 1.4);
+  P.box('trim', x0 - 0.7, x1 + 0.7, c0 + 6.6, c0 + 7.3, z0 - 0.7, z1 + 0.7);
+
+  // Open belvedere.
+  const b0 = c0 + 7.3, bh = 5.2;
+  P.box('clockdark', x0 + 1.6, x1 - 1.6, b0, b0 + bh - 0.6, z0 + 1.6, z1 - 1.6);
+  for (const [ox, oz, facing] of [[x1 - 0.6, z0 + 0.6, 'north'], [x0 + 0.6, z0 + 0.6, 'west'], [x0 + 0.6, z1 - 0.6, 'south'], [x1 - 0.6, z1 - 0.6, 'east']]) {
+    const f = new Frame(P, ox, oz, facing);
+    const ww = w - 1.2;
+    for (const x of [0.5, ww / 3, (2 * ww) / 3, ww - 0.5]) f.box('render', x - 0.45, x + 0.45, b0, b0 + bh, -0.9, 0.1);
+    for (let k = 0; k < 3; k++) {
+      const s = new THREE.Shape();
+      const a = k * (ww / 3) + 0.45, b = (k + 1) * (ww / 3) - 0.45;
+      s.moveTo(a, b0 + bh); s.lineTo(b, b0 + bh); s.lineTo(b, b0 + bh - 1.2);
+      s.absarc((a + b) / 2, b0 + bh - 1.2, (b - a) / 2, 0, Math.PI, false);
+      s.lineTo(a, b0 + bh);
+      f.add('render', new THREE.ExtrudeGeometry(s, { depth: 0.8, bevelEnabled: false, curveSegments: 8 }), 0, 0, -0.75);
+    }
+    balustrade(f, 0.2, ww - 0.2, b0, -0.6, 0.5, 1.0);
+  }
+  P.box('trim', x0 + 0.2, x1 - 0.2, b0 + bh, b0 + bh + 0.6, z0 + 0.2, z1 - 0.2);
+  for (const [x, z] of [[x0 + 0.5, z0 + 0.5], [x1 - 0.5, z0 + 0.5], [x0 + 0.5, z1 - 0.5], [x1 - 0.5, z1 - 0.5]]) {
+    P.box('render', x - 0.55, x + 0.55, b0 + bh + 0.6, b0 + bh + 1.4, z - 0.55, z + 0.55);
+    P.add('render', new THREE.CylinderGeometry(0.05, 0.42, 3.0, 4).rotateY(Math.PI / 4).translate(x, b0 + bh + 2.9, z));
+    P.add('trim', new THREE.SphereGeometry(0.2, 8, 6).translate(x, b0 + bh + 4.5, z));
+  }
+  const tY = b0 + bh + 0.6;
+  P.add('render', new THREE.CylinderGeometry(2.5, 2.8, 1.6, 8).rotateY(Math.PI / 8).translate(cx, tY + 0.8, cz));
+  P.add('render', lathe(domeProfile(2.6, 3.0), 8).rotateY(Math.PI / 8).translate(cx, tY + 1.6, cz));
+  P.add('render', new THREE.CylinderGeometry(0.55, 0.65, 1.5, 8).translate(cx, tY + 5.2, cz));
+  cupola(P, cx, tY + 5.95, cz, 0.7, 1.1, { mat: 'render' });
 }
 
 // ---------------------------------------------------------------------------
-// Swanston St wing (behind the dome block) and the platforms
+// Concourse, Swanston St arcade, platforms and the yards west of them.
 
 function buildPlatforms(parts) {
   const P = parts.platforms;
-  const zs = 34;
-  // Swanston St wing: lower two-storey building beside the platforms.
   const D = parts.dome;
-  D.box('brick', -16, 0, 0, 10, ST.domeW, ST.domeW + 18);
-  for (let y = 1.2; y < 10; y += 1.25) D.box('render', -0.05, 0.06, y, y + 0.32, ST.domeW, ST.domeW + 18);
-  const fw = new Frame(D, 0, ST.domeW + 18, 'east');
-  for (let i = 0; i < 4; i++) {
-    fw.arch(2.2 + i * 4.4, 1.0, 2.6, 3.8, { t: 0.3, sill: false });
-    fw.arch(2.2 + i * 4.4, 5.6, 1.4, 2.8, { t: 0.25 });
-  }
-  D.box('trim', -16, 0.5, 10, 10.6, ST.domeW, ST.domeW + 18);
-  D.box('roof', -15.5, -0.5, 10.6, 11.0, ST.domeW + 0.5, ST.domeW + 17.5);
+  const zA = ST.block, zB = ST.river - 6;
 
-  // Platforms run east-west south of the main building.
-  const xa = -330, xb = -22;
-  P.box('ballast', xa, xb + 20, 0.1, 0.25, ST.depth, zs + 95);
-  const platforms = [];
-  for (let i = 0; i < 6; i++) platforms.push(zs + 4 + i * 15.5);
-  for (const pz of platforms) {
-    P.box('concrete', xa + 20, xb, 0, 1.05, pz - 3.2, pz + 3.2);
-    P.box('marking', xa + 20, xb, 1.05, 1.07, pz - 3.2, pz - 2.9);
-    P.box('marking', xa + 20, xb, 1.05, 1.07, pz + 2.9, pz + 3.2);
-    // Canopy with columns.
-    P.box('canopy', xa + 40, xb - 10, 5.6, 5.9, pz - 4.2, pz + 4.2);
-    P.box('canopy', xa + 40, xb - 10, 5.9, 6.6, pz - 0.6, pz + 0.6);
-    for (let x = xa + 44; x < xb - 10; x += 12) P.box('canopy', x - 0.18, x + 0.18, 1.05, 5.6, pz - 0.18, pz + 0.18);
+  // Swanston St arcade: low glazed shopfronts under a hipped slate roof.
+  D.box('glass', -12, -0.4, 0, 4.0, zA, zB);
+  D.box('render', -12, 0.3, 4.0, 5.0, zA, zB);
+  D.box('trim', -12, 0.5, 5.0, 5.3, zA, zB);
+  hippedRoof(D, -12, 0.5, 5.3, 3.6, zA, zB);
+  for (let z = zA + 4; z < zB; z += 6) D.box('render', -0.6, 0.2, 0, 4.0, z - 0.25, z + 0.25);
+
+  // Concourse deck over the platform ends.
+  P.box('concrete', -74, -12, 0, 8.6, zA + 2, zB);
+  P.box('glass', -74.05, -12, 3.0, 7.0, zA + 2, zB);
+  P.box('roof', -74.5, -11.5, 8.6, 9.2, zA + 1.5, zB + 0.5);
+  for (let z = zA + 8; z < zB - 4; z += 11) {
+    const g = new THREE.CylinderGeometry(1.6, 1.6, 58, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateX(Math.PI / 2);
+    P.add('canopy', g.translate(-43, 9.2, z));
   }
-  // Tracks between platforms.
-  for (let i = 0; i < 6; i++) {
-    const tz = platforms[i] + 7.75;
-    for (const dz of [-0.72, 0.72]) P.box('rail', xa, xb + 20, 0.25, 0.42, tz + dz - 0.04, tz + dz + 0.04);
-    for (let x = xa; x < xb + 20; x += 0.9) P.box('concrete', x - 0.12, x + 0.12, 0.2, 0.3, tz - 1.25, tz + 1.25);
+
+  // Island platforms with long canopies (east half), open tracks to the west.
+  const xa = -236, xb = -74;
+  const zs = [42, 56, 70, 84, 98];
+  P.box('ballast', -520, xb, 0.02, 0.2, ST.depth, zB + 2);
+  for (const pz of zs) {
+    P.box('concrete', xa, xb, 0, 1.05, pz - 3.4, pz + 3.4);
+    P.box('marking', xa, xb, 1.05, 1.07, pz - 3.4, pz - 3.1);
+    P.box('marking', xa, xb, 1.05, 1.07, pz + 3.1, pz + 3.4);
+    // Butterfly canopy: two shallow slopes on a central spine.
+    for (const s of [-1, 1]) {
+      const g = new THREE.BoxGeometry(xb - xa - 6, 0.18, 4.4).rotateX(s * 0.08).translate((xa + xb) / 2, 5.8, pz + s * 2.1);
+      P.add('canopy', g);
+    }
+    P.box('roof', xa + 3, xb - 3, 5.5, 5.75, pz - 0.3, pz + 0.3);
+    for (let x = xa + 6; x < xb - 3; x += 12) P.box('canopy', x - 0.2, x + 0.2, 1.05, 5.6, pz - 0.2, pz + 0.2);
+  }
+  // Tracks: two per gap, through the platforms and out across the yards.
+  const tracks = [ST.depth + 6, 49, 63, 77, 91, 105];
+  for (const tz of tracks) {
+    for (const d of [-1.9, 1.9]) {
+      if (tz + d > zB) continue;
+      for (const r of [-0.72, 0.72]) P.box('rail', -520, xb, 0.2, 0.36, tz + d + r - 0.04, tz + d + r + 0.04);
+      for (let x = xa; x < xb; x += 1.2) P.box('concrete', x - 0.12, x + 0.12, 0.16, 0.24, tz + d - 1.25, tz + d + 1.25);
+    }
+  }
+  // Overhead gantries across the yards.
+  for (let x = -500; x < xa; x += 36) {
+    for (const z of [ST.depth + 2, zB]) P.box('canopy', x - 0.2, x + 0.2, 0.2, 7.2, z - 0.2, z + 0.2);
+    P.box('canopy', x - 0.25, x + 0.25, 6.9, 7.3, ST.depth + 2, zB);
   }
 }
 
@@ -615,18 +840,19 @@ function buildPlatforms(parts) {
 function buildGround(parts) {
   const G = parts.ground;
   const curb = 0.15;
+  const R0 = ST.river, R1 = ST.river + 105;
   // Roads are the asphalt base at y = 0; footpaths and blocks are raised slabs.
-  // Flinders St: z -27..-4.5; Swanston St: x 4.5..23.5; Elizabeth St: x -231..-211.5.
-  G.box('asphalt', -600, 400, -0.3, 0, -500, 140);
-  G.box('asphalt', 4.5, 23.5, -0.3, 0, 140, 238);               // Princes Bridge deck
-  G.box('concrete', 3.5, 4.5, -2.5, 1.1, 140, 238);
-  G.box('concrete', 23.5, 24.5, -2.5, 1.1, 140, 238);
+  // Flinders St: z -27..-4.5; Swanston St: x 4.5..23.5; Elizabeth St (north
+  // of Flinders St only, ending at the clock tower): x -200..-180.
+  G.box('asphalt', -600, 400, -0.3, 0, -500, R0);
+  G.box('asphalt', 4.5, 23.5, -0.3, 0, R0, R1);                 // Princes Bridge deck
+  G.box('concrete', 3.5, 4.5, -2.5, 1.1, R0, R1);
+  G.box('concrete', 23.5, 24.5, -2.5, 1.1, R0, R1);
   const slab = (x0, x1, z0, z1, mat = 'pavement') => G.box(mat, x0, x1, 0, curb, z0, z1);
-  slab(-211.5, 4.5, -4.5, 140);     // station block
-  slab(-600, -231, -4.5, 140);
-  slab(23.5, 400, -4.5, 140);       // Fed Square block
-  slab(-600, -231, -500, -27);
-  slab(-211.5, 4.5, -500, -27);
+  slab(-600, 4.5, -4.5, R0);        // station block
+  slab(23.5, 400, -4.5, R0);        // Fed Square block
+  slab(-600, -200, -500, -27);
+  slab(-180, 4.5, -500, -27);
   slab(23.5, 400, -500, -27);
   G.box('fedsq', 28, 160, curb, curb + 0.05, 0, 110);
 
@@ -635,11 +861,13 @@ function buildGround(parts) {
   for (const d of [-0.72, 0.72]) {
     rail(-600, 400, -18.5 + d - 0.05, -18.5 + d + 0.05);
     rail(-600, 400, -13.0 + d - 0.05, -13.0 + d + 0.05);
-    rail(11.5 + d - 0.05, 11.5 + d + 0.05, -500, 238);
-    rail(17.0 + d - 0.05, 17.0 + d + 0.05, -500, 238);
+    rail(11.5 + d - 0.05, 11.5 + d + 0.05, -500, R1);
+    rail(17.0 + d - 0.05, 17.0 + d + 0.05, -500, R1);
+    rail(-193.5 + d - 0.05, -193.5 + d + 0.05, -500, -18.5);
+    rail(-186.5 + d - 0.05, -186.5 + d + 0.05, -500, -13.0);
   }
   for (let x = -590; x < 390; x += 9) {
-    if (x > -235 && x < -207) continue;
+    if (x > -204 && x < -176) continue;
     if (x > 0 && x < 28) continue;
     G.box('marking', x, x + 4, 0, 0.012, -22.6, -22.4);
     G.box('marking', x, x + 4, 0, 0.012, -9.1, -8.9);
@@ -647,9 +875,11 @@ function buildGround(parts) {
   // Pedestrian crossings at the Swanston intersection, including the diagonal.
   for (let k = 0; k < 9; k++) {
     G.box('marking', 5.5 + k * 2, 6.5 + k * 2, 0, 0.012, -3.9, -0.6);
-    G.box('marking', 5.5 + k * 2, 6.5 + k * 2, 0, 0.012, -30.9, -27.6 + 0.0);
+    G.box('marking', 5.5 + k * 2, 6.5 + k * 2, 0, 0.012, -30.9, -27.6);
     G.box('marking', 0.6, 3.9, 0, 0.012, -26 + k * 2.4, -25 + k * 2.4);
     G.box('marking', 24.1, 27.4, 0, 0.012, -26 + k * 2.4, -25 + k * 2.4);
+    G.box('marking', -199 + k * 2.1, -198 + k * 2.1, 0, 0.012, -30.9, -27.6);
+    G.box('marking', -203.9, -200.6, 0, 0.012, -26 + k * 2.4, -25 + k * 2.4);
   }
   for (let k = 0; k < 12; k++) {
     const g = new THREE.BoxGeometry(1.0, 0.012, 4).translate(0, 0.006, 0).rotateY(Math.PI / 4);
@@ -657,10 +887,10 @@ function buildGround(parts) {
   }
 
   // Yarra River with its banks.
-  G.box('water', -600, 400, -2.5, -1.6, 140, 238);
-  G.box('concrete', -600, 400, -2.5, curb, 138, 140);
-  G.box('concrete', -600, 400, -2.5, curb, 238, 240);
-  G.box('pavement', -600, 400, 0, curb, 240, 420);
+  G.box('water', -600, 400, -2.5, -1.6, R0, R1);
+  G.box('concrete', -600, 400, -2.5, curb, R0 - 2, R0);
+  G.box('concrete', -600, 400, -2.5, curb, R1, R1 + 2);
+  G.box('pavement', -600, 400, 0, curb, R1 + 2, 420);
 }
 
 // Street life: trams, cars and tram overhead poles. Vehicles run along x
@@ -714,7 +944,7 @@ function buildStreetLife(parts) {
   // Tram overhead: poles along both footpaths with span wires and contact wires.
   const wire = (x0, x1, y, z0, z1) => C.box('clockdark', x0, x1, y - 0.015, y + 0.015, z0, z1);
   for (let x = -420; x < 220; x += 32) {
-    if (x > -236 && x < -206) continue;
+    if (x > -205 && x < -175) continue;
     if (x > -2 && x < 30) continue;
     for (const z of [-26.3, -5.2]) C.add('canopy', new THREE.CylinderGeometry(0.12, 0.16, 8, 8).translate(x, 4, z));
     wire(x - 0.02, x + 0.02, 7.2, -26.3, -5.2);
@@ -758,7 +988,7 @@ function genericBuilding(part, rnd, x0, x1, z0, z1, h, facing) {
     part.box(mat, x0, x1, h, h + 1.0, z0, z0 + 0.4);
   } else {
     // Ribbon windows wrap the whole building.
-    for (let y = 5.5; y < h - 2; y += 3.5) part.box('glass', x0 - 0.05, x1 + 0.05, y, y + 1.5, z0 - 0.05, z1 + 0.05);
+    for (let y = 5.5; y < h - 2; y += 3.5) part.box('curtain', x0 - 0.05, x1 + 0.05, y, y + 1.5, z0 - 0.05, z1 + 0.05);
     part.box('roof', x0 + 1, x1 - 1, h, h + 2, z0 + 1, z1 - 1);
   }
 }
@@ -781,28 +1011,28 @@ function buildContext(parts) {
     }
   };
   // Flinders St frontage (facing south toward the station).
-  fill(-231, -22, -31, 30, 'north', 12, 34);
-  fill(-420, -239, -31, 30, 'north', 12, 34);
+  fill(-176, -22, -31, 30, 'north', 12, 34);
+  fill(-420, -204, -31, 30, 'north', 12, 34);
   fill(32, 220, -105, 30, 'north', 12, 40);
   // Behind them, taller towers.
-  fill(-231, 0, -61, 32, 'north', 25, 90);
-  fill(-420, -239, -61, 32, 'north', 25, 80);
-  fill(-231, 0, -125, 40, 'north', 30, 120);
-  fill(-420, -239, -125, 40, 'north', 30, 110);
+  fill(-176, 0, -61, 32, 'north', 25, 90);
+  fill(-420, -204, -61, 32, 'north', 25, 80);
+  fill(-176, 0, -125, 40, 'north', 30, 120);
+  fill(-420, -204, -125, 40, 'north', 30, 110);
   fill(32, 240, -170, 50, 'north', 30, 130);
-  fill(-231, 0, -230, 60, 'north', 40, 150);
-  fill(-420, -239, -230, 60, 'north', 40, 140);
+  fill(-176, 0, -230, 60, 'north', 40, 150);
+  fill(-420, -204, -230, 60, 'north', 40, 140);
   fill(32, 240, -260, 60, 'north', 40, 150);
-  // West of Elizabeth along Flinders St, south side (low railway buildings).
-  C.box('bldg4', -330, -239, 0, 8, 0, 18);
-  C.box('roof', -329, -240, 8, 9, 1, 17);
+  // West of the station along Flinders St, south side (low railway buildings).
+  C.box('bldg4', -400, -256, 0, 8, 0, 18);
+  C.box('roof', -399, -257, 8, 9, 1, 17);
 
   // Southbank skyline across the river.
-  fill(-480, 360, 250, 40, 'south', 30, 120);
+  fill(-480, 360, ST.river + 122, 40, 'south', 30, 120);
 
   // Trees along Swanston St and the river.
-  for (let z = 40; z < 140; z += 12) tree(C, 2.3, z, 1.0);
-  for (let x = -590; x < 380; x += 16) tree(C, x, 244, 1.1);
+  for (let z = 42; z < ST.river - 4; z += 12) tree(C, 2.6, z, 1.0);
+  for (let x = -590; x < 380; x += 16) tree(C, x, ST.river + 113, 1.1);
 
   // Young & Jackson hotel (NW corner of the intersection).
   const Y = parts.youngjackson;
@@ -888,10 +1118,10 @@ function buildContext(parts) {
 
   // Eureka Tower (Southbank) and a couple of other tall landmarks for skyline.
   const E = parts.eureka;
-  E.box('curtain', -175, -147, 0, 268, 315, 345);
-  E.box('gold', -175.2, -146.8, 238, 286, 314.8, 345.2);
-  E.box('bldg5', -173, -149, 286, 297, 317, 343);
-  E.box('bldg3', -178, -143, 0, 20, 310, 350);
+  E.box('curtain', -175, -147, 0, 268, 285, 315);
+  E.box('gold', -175.2, -146.8, 256, 286, 284.8, 315.2);
+  E.box('bldg5', -173, -149, 286, 297, 287, 313);
+  E.box('bldg3', -178, -143, 0, 20, 280, 320);
 }
 
 // ---------------------------------------------------------------------------
