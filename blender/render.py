@@ -11,6 +11,7 @@ so they match the web viewer.
 
 import argparse
 import math
+import os
 import sys
 
 import bpy
@@ -48,6 +49,7 @@ def args():
     p.add_argument("--res", default="1920x1080")
     p.add_argument("--samples", type=int, default=256)
     p.add_argument("--blend", default="", help="also save the scene as a .blend file")
+    p.add_argument("--no-render", action="store_true", help="only build (and save) the scene")
     return p.parse_args(argv)
 
 
@@ -300,16 +302,37 @@ def setup_world(sun_key):
     obj.rotation_euler = (-d).to_track_quat("-Z", "Y").to_euler()
 
 
-def setup_camera(view):
-    pos, target, lens = VIEWS[view]
-    cam = bpy.data.cameras.new("Camera")
-    cam.lens = lens
-    cam.clip_end = 5000
-    obj = bpy.data.objects.new("Camera", cam)
-    bpy.context.scene.collection.objects.link(obj)
-    obj.location = b(pos)
-    obj.rotation_euler = (b(target) - b(pos)).to_track_quat("-Z", "Y").to_euler()
-    bpy.context.scene.camera = obj
+def setup_cameras(active):
+    """One camera per preset (Cam_hero, Cam_dome, ...); `active` renders."""
+    for name, (pos, target, lens) in VIEWS.items():
+        cam = bpy.data.cameras.new(f"Cam_{name}")
+        cam.lens = lens
+        cam.clip_start = 0.3
+        cam.clip_end = 5000
+        obj = bpy.data.objects.new(f"Cam_{name}", cam)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.location = b(pos)
+        obj.rotation_euler = (b(target) - b(pos)).to_track_quat("-Z", "Y").to_euler()
+        if name == active:
+            bpy.context.scene.camera = obj
+
+
+def prepare_for_desktop(scene):
+    """Settings for opening the saved .blend in desktop Blender: GPU if the
+    user has one enabled, light viewport sampling, and 3D views that look
+    through the active camera in Material Preview."""
+    scene.cycles.device = "GPU"
+    scene.cycles.preview_samples = 32
+    scene.cycles.use_preview_denoising = True
+    for screen in bpy.data.screens:
+        for area in screen.areas:
+            if area.type != "VIEW_3D":
+                continue
+            for space in area.spaces:
+                if space.type == "VIEW_3D":
+                    space.shading.type = "MATERIAL"
+                    space.clip_end = 5000
+                    space.region_3d.view_perspective = "CAMERA"
 
 
 def main():
@@ -318,7 +341,7 @@ def main():
     bpy.ops.import_scene.gltf(filepath=a.glb)
     setup_materials()
     setup_world(a.sun)
-    setup_camera(a.view)
+    setup_cameras(a.view)
 
     scene = bpy.context.scene
     w, h = (int(v) for v in a.res.split("x"))
@@ -343,7 +366,13 @@ def main():
     scene.render.image_settings.file_format = "PNG"
     scene.render.filepath = a.out
     if a.blend:
-        bpy.ops.wm.save_as_mainfile(filepath=a.blend)
+        cpu_device = scene.cycles.device
+        prepare_for_desktop(scene)
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(a.blend), compress=True)
+        scene.cycles.device = cpu_device
+        print("saved", a.blend)
+    if a.no_render:
+        return
     bpy.ops.render.render(write_still=True)
     print("wrote", a.out)
 

@@ -154,9 +154,13 @@ function clean(g) {
   return g;
 }
 
+// A named group of merged meshes. `pick` is the PARTS key the viewer shows
+// when it is clicked; several parts can share one (each generic city block is
+// its own part so the viewer can fade it individually).
 class Part {
-  constructor(key) {
+  constructor(key, pick = key) {
     this.key = key;
+    this.pick = pick;
     this.buckets = new Map();
   }
   add(mat, geom) {
@@ -176,7 +180,8 @@ class Part {
     for (const [mat, list] of this.buckets) {
       const mesh = new THREE.Mesh(mergeGeometries(list, false), materials[mat]);
       mesh.name = `${this.key}__${mat}`;
-      mesh.userData.part = this.key;
+      mesh.userData.part = this.pick;
+      mesh.userData.group = this.key;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -1006,7 +1011,9 @@ function buildContext(parts) {
       const h = hMin + rnd() * (hMax - hMin);
       const z0 = facing === 'north' ? zFront - depth : zFront;
       const z1 = facing === 'north' ? zFront : zFront + depth;
-      genericBuilding(C, rnd, x + 0.3, x + w - 0.3, z0, z1, h, facing === 'north' ? 'south' : 'north');
+      const B = new Part(`city_${Object.keys(parts).length}`, 'city');
+      parts[B.key] = B;
+      genericBuilding(B, rnd, x + 0.3, x + w - 0.3, z0, z1, h, facing === 'north' ? 'south' : 'north');
       x += w;
     }
   };

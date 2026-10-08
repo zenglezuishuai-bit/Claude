@@ -19,8 +19,19 @@ src/station.js          three.js generator (one source of truth for the model)
 ```
 
 - **Model** (`src/station.js`): the chamfered entrance block with its great arch, clocks, pediment and ribbed copper dome; the arcaded Flinders St facade (red brick panels between rusticated buff pilasters) with its pavilions; the striped clock tower on the Elizabeth St axis; the domed west-end pavilion; the Swanston St arcade, concourse, platform canopies and yards, plus context buildings: St Paul's Cathedral, Federation Square, Young & Jackson, Eureka Tower, generic CBD blocks, trams, cars and overhead wires. Every mesh is tagged with a part key (`dome`, `clocktower`, `facade`, …) so the viewer can pick it. Coordinates are metres, Y up, +X along Flinders St (grid east), −Z grid north.
-- **Viewer** (`index.html`): generates the model live in the browser. Click a building (or a chip in the bottom rail) to fly to it and read about it. **街景漫游** switches to street-level walking: drag to look, WASD or the arrow keys to move, Shift to run, and on phones use the on-screen arrows. The time slider moves the sun. **渲染图** shows the Blender renders.
+- **Viewer** (`index.html`): generates the model live in the browser. Context buildings that come between the camera and the point being looked at fade to faint ghosts, so the station is never hidden while orbiting. Click a building (or a chip in the bottom rail) to fly to it and read about it. **街景漫游** switches to street-level walking: drag to look, WASD or the arrow keys to move, Shift to run, and on phones use the on-screen arrows. The time slider moves the sun. **渲染图** shows the Blender renders.
 - **Blender** (`blender/render.py`): imports the GLB and replaces the flat materials with procedural ones (brick bond, weathered render, verdigris copper, glass, asphalt, water). It then lights the scene with a physical sky plus a sun lamp and renders with Cycles and denoising. Camera presets use three.js coordinates so they match the viewer.
+
+## Open it in Blender
+
+`blender/flinders.blend` is the ready-made scene (Blender 5.2; it opens in 4.2+ with minor differences). It has the imported model, procedural materials, physical sky and sun, and one camera per preset (`Cam_hero`, `Cam_dome`, `Cam_facade`, `Cam_clocktower`, `Cam_rialto`, `Cam_aerial`).
+
+1. Open the file. The 3D view looks through `Cam_hero` in Material Preview.
+2. For the full Cycles look while you move around, switch the viewport to **Rendered** (press `Z` in the 3D view and pick Rendered, or use the rightmost shading button). Leave camera view with `Numpad 0` or by orbiting with the middle mouse button.
+3. If you have a graphics card, enable it under Edit → Preferences → System → Cycles Render Devices (CUDA / OptiX / HIP / Metal). The scene is already set to use the GPU when one is enabled. On CPU only, Rendered mode is slow; use Material Preview to move and Rendered to check.
+4. To switch preset cameras, select one in the Outliner and press `Ctrl+Numpad 0`. Press `F12` to render a still.
+
+Regenerate the file after changing the model: `npm run export`, then `python blender/render.py --blend blender/flinders.blend --no-render`.
 
 ## Usage
 

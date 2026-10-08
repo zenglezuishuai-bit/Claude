@@ -235,13 +235,22 @@ function setTime(h) {
 const model = buildStation();
 const pickables = [];
 const partMeshes = {};
+// Buildings that may fade out when they block the view: the context, never
+// the station itself (its parts are the subject, and the target often sits
+// inside them).
+const STATION = new Set(['dome', 'facade', 'centre', 'clocktower', 'platforms', 'ground']);
+const occluders = [];
+const groupMeshes = {};
 model.traverse((o) => {
   if (!o.isMesh) return;
   o.material = o.material.clone();
   o.userData.baseEmissive = o.material.emissive.clone();
+  o.userData.opacity = 1;
   const key = o.userData.part;
   if (key !== 'ground') pickables.push(o);
   (partMeshes[key] ||= []).push(o);
+  (groupMeshes[o.userData.group] ||= []).push(o);
+  if (!STATION.has(key) && !/^(tram|car)/.test(o.userData.group) && o.userData.group !== 'city') occluders.push(o);
 });
 scene.add(model);
 document.getElementById('loading').hidden = true;
@@ -324,7 +333,7 @@ function pick(ev) {
   const r = canvas.getBoundingClientRect();
   ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(pickables, false)[0];
+  const hit = ray.intersectObjects(pickables, false).find((h) => !h.object.userData.faded);
   return hit ? hit.object.userData.part : null;
 }
 let down = null;
@@ -417,6 +426,62 @@ camera.position.set(...HOME.pos);
 controls.target.set(...HOME.target);
 { const back = Math.max(1, (1.4 / camera.aspect) ** 0.7); camera.position.sub(controls.target).multiplyScalar(back).add(controls.target); }
 
+// Occlusion: rays from the point being looked at back to the camera (centre
+// plus a ring around it); any context building they pass through fades to a
+// ghost so the view is never blocked. Runs ~10 times a second.
+const occRay = new THREE.Raycaster();
+const occDir = new THREE.Vector3();
+const occFrom = new THREE.Vector3();
+const camRight = new THREE.Vector3();
+const camUp = new THREE.Vector3();
+let blocked = new Set();
+let lastOcc = 0;
+function updateOcclusion(now) {
+  if (now - lastOcc < 100) return;
+  lastOcc = now;
+  const next = new Set();
+  if (!walking) {
+    const dist = camera.position.distanceTo(controls.target);
+    camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+    const r = Math.min(dist * 0.18, 30);
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      occFrom.copy(controls.target).addScaledVector(camRight, dx * r).addScaledVector(camUp, dy * r);
+      occDir.subVectors(camera.position, occFrom);
+      occRay.set(occFrom, occDir.normalize());
+      occRay.far = occFrom.distanceTo(camera.position);
+      for (const h of occRay.intersectObjects(occluders, false)) {
+        if (h.object.userData.part !== selected) next.add(h.object.userData.group);
+      }
+    }
+  }
+  for (const g of blocked) if (!next.has(g)) for (const m of groupMeshes[g]) m.userData.faded = false;
+  for (const g of next) for (const m of groupMeshes[g]) m.userData.faded = true;
+  blocked = new Set([...blocked, ...next]);
+}
+// Ease opacity toward the target each frame; drop transparency once solid.
+function stepFades(dt) {
+  const done = [];
+  for (const g of blocked) {
+    let settled = true;
+    for (const m of groupMeshes[g]) {
+      // Ghosts keep a faint outline; their window bands vanish so stacked ghosts stay clear.
+      const goal = m.userData.faded ? (/glass|curtain|canopy/.test(m.material.name) ? 0 : 0.06) : 1;
+      const o = m.userData.opacity + (goal - m.userData.opacity) * Math.min(1, dt * 10);
+      m.userData.opacity = Math.abs(goal - o) < 0.01 ? goal : o;
+      const mat = m.material;
+      const ghost = m.userData.opacity < 1;
+      if (mat.transparent !== ghost) { mat.transparent = ghost; mat.depthWrite = !ghost; mat.needsUpdate = true; }
+      mat.opacity = m.userData.opacity;
+      m.visible = m.userData.opacity > 0.005;
+      m.castShadow = m.userData.opacity > 0.5;
+      if (m.userData.faded || m.userData.opacity < 1) settled = false;
+    }
+    if (settled) done.push(g);
+  }
+  for (const g of done) blocked.delete(g);
+}
+
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const tmp = new THREE.Vector3();
 let last = performance.now();
@@ -434,6 +499,7 @@ renderer.setAnimationLoop((now) => {
       if (t >= 1) fly = null;
     }
     controls.update();
+    updateOcclusion(now);
     const w = canvas.clientWidth, h = canvas.clientHeight;
     for (const p of pins) {
       tmp.copy(p.v).project(camera);
@@ -442,6 +508,8 @@ renderer.setAnimationLoop((now) => {
       if (vis) p.el.style.translate = `${((tmp.x + 1) / 2) * w}px ${((1 - tmp.y) / 2) * h}px`;
     }
   }
+  if (walking && blocked.size) { for (const g of blocked) for (const m of groupMeshes[g]) m.userData.faded = false; }
+  stepFades(dt);
   renderer.render(scene, camera);
 });
 // Gallery of offline Blender renders shipped next to the page.
