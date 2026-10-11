@@ -49,3 +49,11 @@ node scripts/shoot.mjs out.png dome    # headless screenshot of the viewer (need
 ```
 
 On a 4-core CPU, a 1920×1080 render at 128 samples takes a few minutes per view.
+
+## Clawd 吃汉堡 (15 s animation)
+
+`clawd-burger/` holds a 15-second pixel-art animation of Clawd eating a burger.
+
+- `clawd-burger/clawd-burger.mp4`: the rendered video (1280×720, 30 fps, with sound effects)
+- `clawd-burger/index.html`: the live, looping canvas version with play/pause, seek and sound
+- To re-render: `python3 clawd-burger/sfx.py && node clawd-burger/render.mjs`

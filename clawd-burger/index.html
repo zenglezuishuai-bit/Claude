@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clawd 吃汉堡</title>
+<style>
+  :root { --bg: #F3ECE2; --ink: #3A2E27; --muted: #8A6A55; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1E1A17; --ink: #EDE3D8; --muted: #B59A86; } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "WenQuanYi Zen Hei", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  main { min-height: 100%; display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
+  .stage { width: min(100%, 1280px); }
+  canvas { width: 100%; height: auto; display: block; border-radius: 12px; cursor: pointer;
+    box-shadow: 0 8px 30px rgba(0,0,0,.12); }
+  .bar { display: flex; gap: 12px; align-items: center; margin-top: 12px; font-size: 14px; color: var(--muted); }
+  button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid currentColor;
+    background: transparent; color: var(--ink); cursor: pointer; }
+  input[type=range] { flex: 1; accent-color: #D97757; }
+</style>
+</head>
+<body>
+<main>
+  <div class="stage">
+    <canvas id="c" width="1280" height="720"></canvas>
+    <div class="bar">
+      <button id="play">⏸ 暂停</button>
+      <button id="sound">🔇 声音</button>
+      <input id="seek" type="range" min="0" max="15" step="0.01" value="0">
+      <span id="time">0.0s / 15s</span>
+    </div>
+  </div>
+</main>
+<audio id="sfx" src="sfx.wav" preload="auto"></audio>
+<script>
+// Clawd eats a burger — a 15 s pixel-art animation.
+// Every frame is a pure function of time (renderFrame(t)), so the same code
+// drives the live loop here and the frame-by-frame video export (render.mjs).
+const W = 1280, H = 720, DURATION = 15;
+const GROUND = 545;          // y of the table surface
+const P = 20;                // Clawd pixel size
+const BP = 18;               // burger pixel size
+const BURGER_X = 850;        // burger centre x
+const PLATE_TOP = GROUND - 12;
+const BITES = [5.0, 6.5, 8.0, 9.5];  // start of each bite; the chomp lands 0.3 s later
+const CHOMP = 0.3;
+const FONT = '"WenQuanYi Zen Hei", "PingFang SC", "Microsoft YaHei", sans-serif';
+
+const C = {
+  bg: '#F3ECE2', floor: '#E8DCCB', floorLine: '#D6C3AC',
+  clawd: '#D97757', clawdDark: '#B95E3F', eye: '#1F1A17', tongue: '#E86A6A', blush: '#F4A38E',
+  bunHi: '#F6C66E', bun: '#E9A23B', bunDk: '#C77F22', seed: '#FFF4DA',
+  lettuce: '#71C04A', lettuceDk: '#4F9A30', tomato: '#E2493A', cheese: '#F8D23A',
+  patty: '#6E3D20', pattyDk: '#55301A', plate: '#FFFFFF', plateDk: '#D8D0C6',
+  heart: '#E8555A', text: '#8A6A55',
+};
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = k => 1 - (1 - k) * (1 - k);
+const easeIn = k => k * k;
+const easeInOut = k => k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+const easeOutBack = k => { const c = 1.9; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+function rng(seed) { let s = Math.imul(seed ^ 0x9E3779B9, 2654435761) >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+
+// ---------- burger ----------
+const BURGER = (() => {
+  const m = new Map();
+  const row = (r, c0, c1, col) => { for (let c = c0; c <= c1; c++) m.set(r + ',' + c, col); };
+  row(0, 4, 9, C.bunHi); row(1, 2, 11, C.bun); row(2, 1, 12, C.bun); row(3, 1, 12, C.bunDk);
+  for (const [r, c] of [[1, 3], [2, 2], [1, 4]]) m.set(r + ',' + c, C.bunHi);
+  for (const [r, c] of [[1, 5], [1, 9], [2, 4], [2, 7], [2, 10]]) m.set(r + ',' + c, C.seed);
+  for (let c = 0; c <= 13; c++) m.set('4,' + c, c % 2 ? C.lettuceDk : C.lettuce);
+  row(5, 1, 12, C.tomato);
+  row(6, 0, 13, C.cheese);
+  row(7, 1, 12, C.patty); row(8, 1, 12, C.pattyDk);
+  for (const c of [2, 7, 11]) m.set('7,' + c, C.cheese);
+  row(9, 1, 12, C.bun); row(10, 2, 11, C.bunDk);
+  return [...m].map(([k, col]) => { const [r, c] = k.split(',').map(Number); return { r, c, col }; });
+})();
+const BURGER_ROWS = 11;
+const burgerX0 = BURGER_X - 7 * BP;
+const burgerY0 = PLATE_TOP - BURGER_ROWS * BP;
+
+function eaten(cell, n) {
+  for (let k = 0; k < n; k++) {
+    if (k === 3) return true;
+    const edge = 3.5 * k + 1;
+    if (cell.c + 0.5 < edge) return true;
+    for (const [bx, by] of [[edge + 0.5, 2.5], [edge, 5.5], [edge + 0.5, 8.5]]) {
+      const dx = cell.c + 0.5 - bx, dy = cell.r + 0.5 - by;
+      if (dx * dx + dy * dy < 2.4 * 2.4) return true;
+    }
+  }
+  return false;
+}
+const bitesDone = t => BITES.filter(b => t >= b + CHOMP).length;
+const burgerLeft = n => {
+  let min = Infinity;
+  for (const cell of BURGER) if (!eaten(cell, n)) min = Math.min(min, cell.c);
+  return burgerX0 + (min === Infinity ? 14 : min) * BP;
+};
+const LEFT = [0, 1, 2, 3].map(burgerLeft);
+const home = k => 500 + 0.75 * (LEFT[Math.min(k, 3)] - LEFT[0]);
+
+// ---------- Clawd state over time ----------
+function clawdState(t) {
+  const s = { x: home(0), y: 0, sx: 1, sy: 1, rot: 0, eyes: 'normal', lx: 4, ly: 0,
+              mouth: 0, walk: null, arms: 0, wave: 0, blush: 0 };
+  if (t < 2) {                                         // walk in
+    const k = prog(t, 0, 2);
+    s.x = lerp(-220, home(0), 1 - Math.pow(1 - k, 1.6));
+    s.walk = t * 10; s.y = -Math.abs(Math.sin(t * 10)) * 6;
+  } else if (t < 2.5) {                                // something is falling...
+    s.ly = -lerp(0, 6, prog(t, 2, 2.15)); s.lx = 4;
+  } else if (t < 2.95) {                               // ...surprise jump
+    const k = prog(t, 2.5, 2.95);
+    s.y = -70 * Math.sin(Math.PI * k); s.eyes = 'wide';
+    s.sy = 1 + 0.12 * Math.sin(Math.PI * k); s.sx = 1 - 0.08 * Math.sin(Math.PI * k);
+    s.arms = -P * Math.sin(Math.PI * k);
+  } else if (t < 4.6) {                                // excited hops
+    const k = (t - 2.95) / 0.825, f = k % 1;
+    s.y = -38 * Math.sin(Math.PI * f); s.eyes = 'happy';
+    const land = Math.max(0, 1 - f * 5) + Math.max(0, f * 5 - 4);
+    s.sy = 1 - 0.1 * land; s.sx = 1 + 0.08 * land;
+    s.wave = Math.sin(t * 18) * P * 0.5; s.blush = 1;
+  } else if (t < BITES[0]) {                           // crouch, eyes on the prize
+    const k = easeOut(prog(t, 4.6, 4.85));
+    s.sy = 1 - 0.14 * k; s.sx = 1 + 0.08 * k; s.eyes = 'wide'; s.lx = 5;
+  } else if (t < BITES[3] + 1.5) {                     // four bites
+    const k = Math.min(3, Math.floor((t - BITES[0]) / 1.5)), u = t - BITES[k];
+    const reach = LEFT[k] - (home(k) + 6 * P) + 10;
+    s.x = home(k); s.lx = 5;
+    if (u < CHOMP) {
+      const e = easeIn(u / CHOMP);
+      s.x += reach * e; s.rot = 0.16 * e; s.mouth = Math.min(1, u / CHOMP * 1.4);
+      s.sy = lerp(k === 0 ? 0.86 : 1, 1.08, e); s.sx = lerp(k === 0 ? 1.08 : 1, 0.95, e);
+      s.arms = -P * e; s.eyes = 'wide';
+    } else if (u < 0.4) {
+      s.x += reach; s.rot = 0.16; s.sy = 0.9; s.sx = 1.1; s.eyes = 'closed'; s.arms = -P;
+    } else if (u < 0.7) {
+      const e = easeOut(prog(u, 0.4, 0.7));
+      s.x = lerp(home(k) + reach, home(k + 1), e); s.rot = 0.16 * (1 - e);
+      s.eyes = 'happy'; s.arms = -P * (1 - e);
+    } else {
+      const ph = Math.sin(2 * Math.PI * 5 * (u - 0.7));
+      s.x = home(k + 1); s.sy = 1 + 0.05 * ph; s.sx = 1 - 0.035 * ph;
+      s.mouth = 0.18 * (0.5 + 0.5 * ph); s.eyes = 'happy'; s.blush = 1;
+    }
+  } else {                                             // full!
+    s.x = home(3);
+    const grow = easeOutBack(prog(t, 11.0, 11.5));
+    s.sx = 1 + 0.16 * grow; s.sy = 1 + 0.06 * grow;
+    s.eyes = t < 11.6 ? 'wide' : 'happy'; s.lx = 5; s.ly = t < 11.6 ? 4 : 0;
+    if (t >= 11.65 && t < 12.2) {                      // burp
+      const k = prog(t, 11.65, 12.2);
+      s.mouth = 0.75 * Math.sin(Math.PI * Math.min(1, k * 1.6));
+      s.rot = -0.1 * Math.sin(Math.PI * k); s.sy += 0.08 * Math.sin(Math.PI * k);
+      s.eyes = 'closed';
+    }
+    if (t >= 12.4) {                                   // happy sway
+      const k = t - 12.4;
+      s.rot = 0.09 * Math.sin(2 * Math.PI * 1.1 * k) * Math.min(1, k * 3);
+      s.wave = Math.sin(t * 14) * P * 0.5; s.blush = 1;
+    }
+    if (t >= 11.8) s.blush = Math.max(s.blush, prog(t, 11.8, 12.2));
+  }
+  // blink now and then
+  if (s.eyes === 'normal' && [[1.15, 1.27], [2.2, 2.3]].some(([a, b]) => t >= a && t < b)) s.eyes = 'closed';
+  return s;
+}
+
+// ---------- drawing ----------
+function drawClawd(ctx, s) {
+  ctx.save();
+  ctx.translate(s.x, GROUND + s.y);
+  ctx.rotate(s.rot);
+  ctx.scale(s.sx, s.sy);
+  const box = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w + 0.6, h + 0.6); };
+  const cell = (c, r, w, h, col, dy = 0) => box((c - 8) * P, (r - 8) * P + dy, w * P, h * P, col);
+  // legs (two pairs, alternating when walking)
+  const step = s.walk == null ? 0 : Math.sin(s.walk);
+  for (const [c, pair] of [[3, 0], [5, 1], [10, 0], [12, 1]]) {
+    const lift = Math.max(0, pair ? -step : step) * P * 0.9;
+    box((c - 8) * P, -2 * P, P, 2 * P - lift, C.clawd);
+  }
+  cell(2, 0, 12, 6, C.clawd);                                   // body
+  cell(0, 3, 2, 1, C.clawd, s.arms + s.wave);                   // arms
+  cell(14, 3, 2, 1, C.clawd, s.arms - s.wave);
+  // eyes
+  for (const c of [4, 11]) {
+    const x = (c - 8) * P + s.lx, y = (1 - 8) * P + s.ly;
+    if (s.eyes === 'normal') box(x, y, P, 2 * P, C.eye);
+    else if (s.eyes === 'wide') { box(x - 2, y - 4, P + 4, 2 * P + 4, C.eye); box(x + 1, y - 1, 6, 6, '#FFFFFF'); }
+    else if (s.eyes === 'closed') box(x - 3, y + P, P + 6, 5, C.eye);
+    else if (s.eyes === 'happy') {
+      const q = P * 0.55;
+      box(x - q * 0.9, y + P * 0.9, q, q, C.eye); box(x + P / 2 - q / 2, y + P * 0.3, q, q, C.eye);
+      box(x + P - q * 0.1, y + P * 0.9, q, q, C.eye);
+    }
+  }
+  if (s.blush > 0) {
+    ctx.globalAlpha = s.blush * 0.85;
+    for (const c of [3, 12]) box((c - 8) * P + s.lx, (3 - 8) * P + 4, P, P * 0.55, C.blush);
+    ctx.globalAlpha = 1;
+  }
+  if (s.mouth > 0.02) {                                         // mouth
+    const w = 3 * P, h = Math.max(4, s.mouth * 2 * P);
+    const x = -w / 2 + s.lx * 2.5, y = (3 - 8) * P + 6;
+    box(x, y, w, h, C.eye);
+    if (s.mouth > 0.45) box(x + P * 0.5, y + h - P * 0.6, w - P, P * 0.6 - 3, C.tongue);
+  }
+  ctx.restore();
+}
+
+function drawBurger(ctx, t) {
+  const n = bitesDone(t);
+  if (n >= 4) return;
+  let dy = 0, sq = 0;
+  if (t < 2.5) dy = -lerp(800, 0, easeIn(prog(t, 2.0, 2.5)));
+  else if (t < 2.95) { const k = prog(t, 2.5, 2.95); dy = -34 * Math.sin(Math.PI * k) * (k > 0.08 ? 1 : 0); sq = 0.18 * Math.max(0, 1 - k * 6); }
+  for (const b of BITES) {
+    const u = t - b - CHOMP;
+    if (u >= 0 && u < 0.3) sq += 0.08 * Math.sin(Math.PI * u / 0.3);
+  }
+  ctx.save();
+  ctx.translate(BURGER_X, PLATE_TOP + dy);
+  ctx.scale(1 + sq, 1 - sq);
+  ctx.translate(-BURGER_X, -PLATE_TOP);
+  for (const cell of BURGER) {
+    if (eaten(cell, n)) continue;
+    ctx.fillStyle = cell.col;
+    ctx.fillRect(burgerX0 + cell.c * BP, burgerY0 + cell.r * BP, BP + 0.6, BP + 0.6);
+  }
+  ctx.restore();
+}
+
+function drawPixels(ctx, rows, x, y, p, col) {
+  ctx.fillStyle = col;
+  rows.forEach((row, r) => [...row].forEach((ch, c) => { if (ch === 'X') ctx.fillRect(x + c * p, y + r * p, p + 0.5, p + 0.5); }));
+}
+const HEART = ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...'];
+const BANG = ['XX', 'XX', 'XX', 'XX', '..', 'XX'];
+const STAR = ['..X..', '..X..', 'XXXXX', '..X..', '..X..'];
+
+function popText(ctx, text, x, y, t, t0, dur, size, col) {
+  const k = (t - t0) / dur;
+  if (k < 0 || k > 1) return;
+  const sc = easeOutBack(Math.min(1, k * 5)), a = 1 - Math.max(0, (k - 0.7) / 0.3);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.translate(x, y - 30 * k);
+  ctx.scale(sc, sc);
+  ctx.font = `bold ${size}px ${FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = size * 0.18; ctx.strokeStyle = '#FFFFFF'; ctx.lineJoin = 'round';
+  ctx.strokeText(text, 0, 0);
+  ctx.fillStyle = col; ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+function drawCrumbs(ctx, t) {
+  const cols = [C.bun, C.bunDk, C.lettuce, C.cheese, C.patty, C.tomato, C.seed];
+  BITES.forEach((b, k) => {
+    const t0 = b + CHOMP, dt = t - t0;
+    if (dt < 0) return;
+    const r = rng(101 + k * 17);
+    for (let i = 0; i < 12; i++) {
+      const x0 = LEFT[k] + 6, y0 = burgerY0 + r() * BURGER_ROWS * BP;
+      const vx = -120 + r() * 260, vy = -260 - r() * 260, g = 1500, sz = r() < 0.5 ? 6 : 8;
+      const col = cols[Math.floor(r() * cols.length)];
+      const floor = GROUND - sz;
+      const tLand = (-vy + Math.sqrt(vy * vy + 2 * g * (floor - y0))) / g;
+      const tt = Math.min(dt, tLand);
+      ctx.fillStyle = col;
+      ctx.fillRect(x0 + vx * tt, y0 + vy * tt + 0.5 * g * tt * tt, sz, sz);
+    }
+  });
+}
+
+function renderFrame(t, ctx = document.getElementById('c').getContext('2d')) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  // camera shake on each chomp
+  let shx = 0, shy = 0;
+  for (const b of BITES) {
+    const u = t - b - CHOMP;
+    if (u >= 0 && u < 0.15) { const r = rng(Math.floor(t * 60) + 7); const m = 9 * (1 - u / 0.15); shx = (r() - .5) * m; shy = (r() - .5) * m; }
+  }
+  ctx.translate(shx, shy);
+
+  // table + plate
+  ctx.fillStyle = C.floor; ctx.fillRect(-20, GROUND, W + 40, H - GROUND + 20);
+  ctx.fillStyle = C.floorLine; ctx.fillRect(-20, GROUND, W + 40, 5);
+  ctx.fillStyle = C.plateDk; ctx.fillRect(BURGER_X - 140, PLATE_TOP + 6, 280, 6);
+  ctx.fillStyle = C.plate; ctx.fillRect(BURGER_X - 165, PLATE_TOP, 330, 7);
+
+  const s = clawdState(t);
+  // shadows
+  ctx.fillStyle = 'rgba(80,50,30,0.13)';
+  const shw = 150 * s.sx * (1 - Math.min(0.5, -s.y / 160));
+  ctx.beginPath(); ctx.ellipse(s.x, GROUND + 6, shw, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+  drawBurger(ctx, t);
+  drawCrumbs(ctx, t);
+  drawClawd(ctx, s);
+
+  // falling burger sparkles
+  if (t > 2.95 && t < 4.9) {
+    [[BURGER_X - 130, burgerY0 - 10, 0], [BURGER_X + 120, burgerY0 + 20, 0.3], [BURGER_X + 40, burgerY0 - 50, 0.6], [BURGER_X - 60, burgerY0 - 60, 0.9]]
+      .forEach(([x, y, ph]) => {
+        const k = (t * 2.2 + ph) % 1;
+        const a = Math.sin(Math.PI * k);
+        ctx.globalAlpha = a; drawPixels(ctx, STAR, x, y, 5 * (0.6 + 0.6 * a), C.cheese); ctx.globalAlpha = 1;
+      });
+  }
+  // "!" over Clawd's head
+  if (t >= 2.5 && t < 3.5) {
+    const k = prog(t, 2.5, 2.65), a = 1 - prog(t, 3.3, 3.5);
+    ctx.globalAlpha = a;
+    drawPixels(ctx, BANG, s.x - 7, GROUND + s.y - 8 * P - 80 + 20 * (1 - easeOutBack(k)), 7, C.clawdDark);
+    ctx.globalAlpha = 1;
+  }
+  // chomp text
+  BITES.forEach((b, k) => popText(ctx, k === 3 ? '啊呜~!' : '啊呜!', LEFT[k] + 10, burgerY0 - 50, t, b + CHOMP, 0.8, 46, C.clawdDark));
+  // burp
+  popText(ctx, '嗝~', home(3) + 150, GROUND - 190, t, 11.7, 1.0, 58, C.text);
+  if (t >= 11.7 && t < 12.6) {
+    const k = prog(t, 11.7, 12.6);
+    ctx.globalAlpha = 0.5 * (1 - k); ctx.strokeStyle = C.plateDk; ctx.lineWidth = 4;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(home(3) + 100 + i * 28, GROUND - 90 - k * 60 - i * 16, 8 + k * 14 + i * 3, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  // hearts
+  for (let i = 0; i < 8; i++) {
+    const t0 = 12.6 + i * 0.22, dt = t - t0;
+    if (dt < 0 || dt > 1.8) continue;
+    const r = rng(500 + i);
+    const x = home(3) - 170 + r() * 320 + Math.sin(dt * 5 + i) * 10, y = GROUND - 8 * P - 70 - r() * 40 - dt * 110;
+    const sc = 5 + r() * 3;
+    ctx.globalAlpha = Math.min(1, dt * 6) * (1 - Math.max(0, (dt - 1.2) / 0.6));
+    drawPixels(ctx, HEART, x, y, sc, C.heart);
+    ctx.globalAlpha = 1;
+  }
+  // titles
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const title = (text, t0, t1, size, col) => {
+    const a = Math.min(prog(t, t0, t0 + 0.4), 1 - prog(t, t1 - 0.4, t1));
+    if (a <= 0) return;
+    ctx.globalAlpha = a; ctx.font = `bold ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = col; ctx.fillText(text, W / 2, 120 - 12 * (1 - easeOut(prog(t, t0, t0 + 0.4))));
+    ctx.globalAlpha = 1;
+  };
+  title('Clawd 的午餐时间', 0.2, 2.2, 46, C.text);
+  title('吃饱啦！', 12.9, 15.1, 64, C.clawdDark);
+  // fade in / out so the loop is seamless
+  const fade = Math.max(1 - prog(t, 0, 0.3), prog(t, 14.4, 15));
+  if (fade > 0) { ctx.globalAlpha = fade; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+}
+window.renderFrame = renderFrame;
+
+// ---------- live player ----------
+if (!new URLSearchParams(location.search).has('export')) {
+  const seek = document.getElementById('seek'), timeEl = document.getElementById('time');
+  const playBtn = document.getElementById('play'), soundBtn = document.getElementById('sound');
+  const audio = document.getElementById('sfx');
+  let playing = true, muted = true, t = 0, last = performance.now();
+  const syncAudio = () => {
+    if (muted || !playing) { audio.pause(); return; }
+    try { audio.currentTime = t; audio.play().catch(() => {}); } catch {}
+  };
+  const frame = now => {
+    if (playing) {
+      t += (now - last) / 1000;
+      if (t >= DURATION) { t %= DURATION; syncAudio(); }
+    }
+    last = now;
+    renderFrame(t);
+    seek.value = t; timeEl.textContent = `${t.toFixed(1)}s / ${DURATION}s`;
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  const togglePlay = () => { playing = !playing; playBtn.textContent = playing ? '⏸ 暂停' : '▶ 播放'; syncAudio(); };
+  playBtn.onclick = togglePlay;
+  document.getElementById('c').onclick = togglePlay;
+  soundBtn.onclick = () => { muted = !muted; soundBtn.textContent = muted ? '🔇 声音' : '🔊 声音'; syncAudio(); };
+  seek.oninput = () => { t = +seek.value; syncAudio(); };
+}
+</script>
+</body>
+</html>
