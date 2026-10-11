@@ -1,0 +1,8 @@
+{
+  "name": "mg-explainer",
+  "private": true,
+  "description": "Clawd 的 15 种画法 — a code-rendered explainer of the 15 motion-design styles in mg-styles-15",
+  "type": "module",
+  "scripts": { "render": "node harness/render.mjs ." },
+  "dependencies": { "puppeteer-core": "25.12.0" }
+}
