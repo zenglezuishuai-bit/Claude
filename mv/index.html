@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我喜欢 MG 样片</title>
+<style>
+  :root { --bg: #000; --ui: #f3e6cf; --ui-dim: #a89a85; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ui); font-family: "WenQuanYi Zen Hei", "PingFang SC", "Noto Sans SC", sans-serif; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  /* 4:3 frame inside whatever window, black pillarbox like the original MV */
+  #film { height: min(100vh, 75vw); aspect-ratio: 4 / 3; display: block; }
+  #ui { position: fixed; left: 16px; right: 16px; bottom: 12px; display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--ui-dim); }
+  #ui button, #ui label { background: #1d1a17; color: var(--ui); border: 1px solid #3a342d; border-radius: 6px; padding: 6px 10px; cursor: pointer; font: inherit; }
+  #ui input[type=file] { display: none; }
+  #time { font-variant-numeric: tabular-nums; }
+  body.capture #ui { display: none; }
+  body.capture #film { height: 100vh; }
+</style>
+</head>
+<body>
+<div id="stage"><svg id="film" viewBox="0 0 1440 1080" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="ui">
+  <button id="play">▶ 播放</button>
+  <label>载入音频<input id="audio" type="file" accept="audio/*"></label>
+  <span id="time">0.00s</span>
+  <span>空格播放/暂停 · 方向键 ±1s</span>
+</div>
+<script>
+// ---- timing -------------------------------------------------------------
+// Everything is a pure function of t (seconds), so the browser preview and the
+// frame-by-frame MP4 render produce identical pictures.
+const BPM = 90;                 // placeholder until the real track is synced
+const SPB = 60 / BPM;
+const SCENES = [                // [start, end]
+  ['street', 0, 5.5],
+  ['sky', 5.5, 10.5],
+  ['cafe', 10.5, 16.5],
+  ['card', 16.5, 21],
+];
+const DURATION = 21;
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const easeOutBack = k => { const c = 1.70158; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+const beatPos = t => t / SPB;
+const pulse = (t, sharp = 6) => Math.exp(-(beatPos(t) % 1) * sharp);   // 1 on the beat, decays
+const swing = t => Math.sin(beatPos(t) * Math.PI);                       // -1..1, one sway per 2 beats
+
+// ---- palette (sampled from the original MV's teal/orange grade) ---------
+const C = {
+  cream: '#d9cfb8', creamHi: '#e9e0c9', teal: '#2c5b52', tealDk: '#1f4640', band: '#4d5c47',
+  curb: '#e3a62b', walk: '#a2988a', road: '#2f5a50',
+  sky1: '#2a78c4', sky2: '#86c4e6',
+  orange: '#e3763a', orangeDk: '#b9572a', mint: '#8fd1bd', mintDk: '#5fae99',
+  red: '#d63a2a', yellow: '#f6d03a', warm1: '#efd2a6', warm2: '#d9a874', wood: '#6e4a36', ink: '#2a2420',
+};
+
+// ---- original character: 小橘 --------------------------------------------
+// A round orange bean with a sprout, freckles and a mint jacket (a nod to the
+// MV's mint shirt). Origin is between the feet.
+function charSVG(id) {
+  return `
+  <g id="${id}">
+    <ellipse id="${id}-shadow" cx="0" cy="4" rx="70" ry="12" fill="#000" opacity=".22"/>
+    <g id="${id}-legL"><rect x="-34" y="-48" width="24" height="44" rx="10" fill="${C.ink}"/><ellipse cx="-24" cy="-4" rx="20" ry="9" fill="${C.ink}"/></g>
+    <g id="${id}-legR"><rect x="10" y="-48" width="24" height="44" rx="10" fill="${C.ink}"/><ellipse cx="24" cy="-4" rx="20" ry="9" fill="${C.ink}"/></g>
+    <g id="${id}-body">
+      <g id="${id}-armL"><ellipse cx="-70" cy="-80" rx="15" ry="28" fill="${C.mintDk}"/><circle cx="-72" cy="-54" r="11" fill="${C.orange}"/></g>
+      <g id="${id}-armR"><ellipse cx="70" cy="-80" rx="15" ry="28" fill="${C.mintDk}"/><circle cx="72" cy="-54" r="11" fill="${C.orange}"/></g>
+      <clipPath id="${id}-clip"><rect x="-66" y="-190" width="132" height="150" rx="58"/></clipPath>
+      <rect x="-66" y="-190" width="132" height="150" rx="58" fill="${C.orange}"/>
+      <g clip-path="url(#${id}-clip)">
+        <rect x="-70" y="-98" width="140" height="70" fill="${C.mint}"/>
+        <path d="M-12 -98 L0 -80 L12 -98 Z" fill="${C.orange}"/>
+        <rect x="-70" y="-190" width="30" height="160" fill="${C.orangeDk}" opacity=".18"/>
+        <rect x="40" y="-190" width="30" height="160" fill="#fff" opacity=".08"/>
+      </g>
+      <g id="${id}-face">
+        <g id="${id}-eyes"><ellipse cx="-24" cy="-138" rx="7" ry="10" fill="${C.ink}"/><ellipse cx="24" cy="-138" rx="7" ry="10" fill="${C.ink}"/>
+          <circle cx="-22" cy="-142" r="2.4" fill="#fff"/><circle cx="26" cy="-142" r="2.4" fill="#fff"/></g>
+        <ellipse cx="-42" cy="-116" rx="11" ry="6" fill="#f29a8a" opacity=".75"/><ellipse cx="42" cy="-116" rx="11" ry="6" fill="#f29a8a" opacity=".75"/>
+        <g fill="${C.orangeDk}" opacity=".6"><circle cx="-36" cy="-124" r="1.6"/><circle cx="-30" cy="-120" r="1.6"/><circle cx="36" cy="-124" r="1.6"/><circle cx="30" cy="-120" r="1.6"/></g>
+        <path id="${id}-mouth" d="M-9 -118 Q0 -110 9 -118" stroke="${C.ink}" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      </g>
+      <g id="${id}-sprout"><path d="M0 -188 Q-2 -204 4 -214" stroke="#4f8f45" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <ellipse cx="16" cy="-218" rx="14" ry="7" fill="#6db35e" transform="rotate(-25 16 -218)"/>
+        <ellipse cx="-6" cy="-214" rx="10" ry="5" fill="#86c76f" transform="rotate(30 -6 -214)"/></g>
+    </g>
+  </g>`;
+}
+const $ = id => document.getElementById(id);
+function poseChar(id, p) {
+  const { x = 0, y = 0, s = 1, bob = 0, tilt = 0, walk = null, armL = 0, armR = 0, look = [0, 0], blink = 0, flip = 1, mouth = 0 } = p;
+  $(id).setAttribute('transform', `translate(${x} ${y}) scale(${s * flip} ${s})`);
+  $(id + '-body').setAttribute('transform', `translate(0 ${-bob}) rotate(${tilt} 0 -40)`);
+  if (walk !== null) {
+    const a = Math.sin(walk) * 7;
+    $(id + '-legL').setAttribute('transform', `translate(${a} ${Math.max(0, -Math.cos(walk)) * -6})`);
+    $(id + '-legR').setAttribute('transform', `translate(${-a} ${Math.max(0, Math.cos(walk)) * -6})`);
+  } else { $(id + '-legL').removeAttribute('transform'); $(id + '-legR').removeAttribute('transform'); }
+  $(id + '-armL').setAttribute('transform', `rotate(${armL} -66 -100)`);
+  $(id + '-armR').setAttribute('transform', `rotate(${-armR} 66 -100)`);
+  $(id + '-eyes').setAttribute('transform', `translate(${look[0]} ${look[1]}) translate(0 -138) scale(1 ${1 - blink * .9}) translate(0 138)`);
+  $(id + '-mouth').setAttribute('d', mouth > 0 ? `M-11 -119 Q0 ${-119 + 10 + mouth * 8} 11 -119 Z` : 'M-9 -118 Q0 -110 9 -118');
+  $(id + '-mouth').setAttribute('fill', mouth > 0 ? C.ink : 'none');
+  $(id + '-shadow').setAttribute('rx', 70 - bob * .6);
+}
+const blinkAt = (t, seed = 0) => { const k = ((t + seed) % 3.1) / 3.1; return k > .96 ? Math.sin((k - .96) / .04 * Math.PI) : 0; };
+
+// ---- scenes -------------------------------------------------------------
+const svg = $('film');
+function tiles(x0, y0, w, h, tw, th, color, op) {
+  let d = '';
+  for (let y = y0; y <= y0 + h; y += th) d += `M${x0} ${y}H${x0 + w}`;
+  for (let r = 0, y = y0; y < y0 + h; y += th, r++) for (let x = x0 + (r % 2 ? tw / 2 : 0); x <= x0 + w; x += tw) d += `M${x} ${y}V${Math.min(y + th, y0 + h)}`;
+  return `<path d="${d}" stroke="${color}" stroke-width="2" opacity="${op}"/>`;
+}
+function windowGrid(pts, cols, rows, color, op) {   // windows inside a quad (tl,tr,br,bl)
+  const [tl, tr, br, bl] = pts; let d = '';
+  const P = (u, v) => { const top = [lerp(tl[0], tr[0], u), lerp(tl[1], tr[1], u)], bot = [lerp(bl[0], br[0], u), lerp(bl[1], br[1], u)]; return [lerp(top[0], bot[0], v), lerp(top[1], bot[1], v)]; };
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const u0 = (i + .18) / cols, u1 = (i + .82) / cols, v0 = (j + .2) / rows, v1 = (j + .8) / rows;
+    const a = P(u0, v0), b = P(u1, v0), c = P(u1, v1), e = P(u0, v1);
+    d += `M${a}L${b}L${c}L${e}Z`;
+  }
+  return `<path d="${d}" fill="${color}" opacity="${op}"/>`;
+}
+
+svg.innerHTML = `
+<defs>
+  <linearGradient id="shadeEdge" x1="0" x2="1"><stop offset="0" stop-color="${C.teal}" stop-opacity="0"/><stop offset=".12" stop-color="${C.teal}" stop-opacity=".92"/><stop offset="1" stop-color="${C.tealDk}" stop-opacity=".96"/></linearGradient>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.sky1}"/><stop offset="1" stop-color="${C.sky2}"/></linearGradient>
+  <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe8"/><stop offset=".25" stop-color="#fff2c4" stop-opacity=".9"/><stop offset="1" stop-color="#ffe3a0" stop-opacity="0"/></radialGradient>
+  <linearGradient id="cafeWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c99464"/><stop offset="1" stop-color="${C.warm1}"/></linearGradient>
+  <linearGradient id="outside" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6dc"/><stop offset="1" stop-color="#f3d9a6"/></linearGradient>
+  <linearGradient id="beam" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff4d6" stop-opacity=".55"/><stop offset="1" stop-color="#fff4d6" stop-opacity="0"/></linearGradient>
+  <radialGradient id="cardBg" cx=".5" cy=".42" r=".75"><stop offset="0" stop-color="#ffe76a"/><stop offset="1" stop-color="#f2c21f"/></radialGradient>
+  <radialGradient id="ball" cx=".38" cy=".32" r=".75"><stop offset="0" stop-color="#ff7a55"/><stop offset=".55" stop-color="${C.red}"/><stop offset="1" stop-color="#8f1e14"/></radialGradient>
+  <radialGradient id="vignette" cx=".5" cy=".5" r=".72"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence id="grainNoise" type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="1"/><feColorMatrix type="saturate" values="0"/></filter>
+  <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
+  <filter id="bloom"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+
+<!-- SCENE 1: street wall with the hard teal shadow and yellow curb -->
+<g id="s-street">
+  <g id="street-cam">
+    <rect x="-200" y="0" width="1900" height="770" fill="${C.cream}"/>
+    ${tiles(-200, 0, 1900, 300, 190, 100, '#b9ae96', .55)}
+    ${tiles(-200, 345, 1900, 425, 190, 106, '#b9ae96', .55)}
+    <g fill="#1c2522">${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<rect x="${-120 + i * 230}" y="40" width="90" height="80"/>`).join('')}</g>
+    <rect x="-200" y="300" width="1900" height="45" fill="${C.band}"/>
+    <g id="vent"><rect x="560" y="370" width="270" height="230" fill="#2a2d29"/>
+      <path d="${Array.from({ length: 15 }, (_, i) => `M566 ${384 + i * 14.5}H824`).join('')}" stroke="#c9c1ae" stroke-width="6"/></g>
+    <rect x="-200" y="770" width="1900" height="60" fill="${C.walk}"/>
+    <rect x="-200" y="830" width="1900" height="26" fill="${C.curb}"/>
+    <rect x="-200" y="856" width="1900" height="230" fill="${C.road}"/>
+    <path d="M-200 900 H1700" stroke="#3c6a5f" stroke-width="3" opacity=".6"/>
+    <g id="street-char"></g>
+    <!-- the shadow is drawn over the character too, so it walks into the shade -->
+    <polygon id="street-shadow" points="900,0 1700,0 1700,1080 760,1080" fill="url(#shadeEdge)" style="mix-blend-mode:multiply"/>
+  </g>
+</g>
+
+<!-- SCENE 2: worm's-eye view between two towers -->
+<g id="s-sky">
+  <g id="sky-cam">
+    <rect x="-300" y="-300" width="2040" height="1680" fill="url(#sky)"/>
+    <g id="clouds" fill="#fff" opacity=".7" filter="url(#soft)"><ellipse cx="600" cy="220" rx="120" ry="28"/><ellipse cx="700" cy="200" rx="80" ry="22"/><ellipse cx="900" cy="330" rx="90" ry="18"/></g>
+    <polygon points="-300,1380 420,1380 600,-300 -300,-300" fill="#355f86"/>
+    ${windowGrid([[-300, -300], [600, -300], [420, 1380], [-300, 1380]], 9, 22, '#1d3550', .9)}
+    <polygon points="380,1380 420,1380 600,-300 560,-300" fill="#9fc3df" opacity=".6"/>
+    <polygon points="1740,1380 1030,1380 880,-300 1740,-300" fill="#d7e7f2"/>
+    ${windowGrid([[880, -300], [1740, -300], [1740, 1380], [1030, 1380]], 7, 26, '#4b7ea6', .85)}
+    <polygon points="1030,1380 1080,1380 925,-300 880,-300" fill="#ffffff" opacity=".7"/>
+    <circle id="sun-flare" cx="1210" cy="40" r="260" fill="url(#sun)"/>
+    <g id="sky-char"></g>
+  </g>
+</g>
+
+<!-- SCENE 3: window seat inside the burger shop -->
+<g id="s-cafe">
+  <rect width="1440" height="1080" fill="url(#cafeWall)"/>
+  <rect x="0" y="0" width="1440" height="90" fill="#b98054"/>
+  <g fill="#fff3c9">${[300, 640, 980, 1300].map(x => `<ellipse cx="${x}" cy="88" rx="26" ry="8"/>`).join('')}</g>
+  <!-- big windows on the right, bright outside -->
+  <rect x="760" y="140" width="680" height="700" fill="url(#outside)"/>
+  <g id="trees" fill="#c9b68a" opacity=".55" filter="url(#soft)"><circle cx="900" cy="330" r="90"/><circle cx="1020" cy="290" r="110"/><circle cx="1240" cy="320" r="120"/><circle cx="1380" cy="280" r="90"/></g>
+  <g fill="#3b2e27">${[760, 930, 1100, 1270, 1430].map(x => `<rect x="${x - 7}" y="140" width="14" height="700"/>`).join('')}<rect x="760" y="140" width="680" height="16"/><rect x="760" y="480" width="680" height="10"/></g>
+  <!-- pillar -->
+  <rect x="560" y="90" width="170" height="900" fill="#efdcbf"/><rect x="690" y="90" width="40" height="900" fill="#d8bf98"/>
+  <rect x="560" y="150" width="170" height="26" fill="#c96f45"/>
+  <!-- original shop sign through the window (no real brand) -->
+  <g id="sign" transform="translate(110 210) rotate(-6)"><rect width="330" height="200" rx="14" fill="#c95b37"/>
+    <circle cx="80" cy="100" r="52" fill="${C.yellow}"/><path d="M52 104 Q80 136 108 104" stroke="${C.red}" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="64" cy="84" r="7" fill="${C.red}"/><circle cx="96" cy="84" r="7" fill="${C.red}"/>
+    <text x="150" y="92" font-size="44" fill="#ffe9b8" font-weight="bold">小橘</text><text x="150" y="140" font-size="30" fill="#ffe9b8">汉堡屋</text></g>
+  <g id="beams" style="mix-blend-mode:screen"></g>
+  <g id="patrons"><g id="patron1" fill="#3a2a22" opacity=".8"><circle cx="1180" cy="600" r="34"/><rect x="1140" y="630" width="80" height="140" rx="36"/></g>
+    <g id="patron2" fill="#4a352a" opacity=".8"><circle cx="1320" cy="590" r="32"/><rect x="1282" y="618" width="76" height="150" rx="34"/></g></g>
+  <g id="cafe-char"></g>
+  <!-- table in the foreground -->
+  <polygon points="200,830 1440,800 1440,1080 120,1080" fill="${C.wood}"/>
+  <polygon points="200,830 1440,800 1440,822 196,852" fill="#8a5d43"/>
+  <g id="spots" style="mix-blend-mode:screen"></g>
+  <g id="cup"><path d="M-46 -150 L46 -150 L34 0 L-34 0 Z" fill="${C.red}"/><rect x="-52" y="-166" width="104" height="18" rx="6" fill="#f5efe2"/>
+    <rect x="6" y="-250" width="10" height="90" rx="4" fill="#f5efe2" transform="rotate(12 11 -160)"/><path d="M-40 -100 L40 -100 L37 -64 L-37 -64 Z" fill="${C.mint}"/></g>
+  <g id="fries"><g fill="#f5c542">${[-34, -18, -2, 14, 30].map((x, i) => `<rect x="${x}" y="${-150 - (i % 2) * 18}" width="12" height="90" rx="3" transform="rotate(${(i - 2) * 5} ${x} -60)"/>`).join('')}</g>
+    <path d="M-50 -90 L50 -90 L38 0 L-38 0 Z" fill="${C.red}"/><circle cx="0" cy="-48" r="16" fill="${C.yellow}"/></g>
+</g>
+
+<!-- SCENE 4: yellow end card with an original logo and slogan -->
+<g id="s-card">
+  <rect width="1440" height="1080" fill="url(#cardBg)"/>
+  <g id="rays" opacity=".18" fill="#fff"></g>
+  <g id="logo"><circle r="190" fill="url(#ball)"/><ellipse cx="-70" cy="-90" rx="70" ry="38" fill="#fff" opacity=".25" transform="rotate(-30 -70 -90)"/>
+    <path d="M-80 10 Q0 110 80 10" stroke="#ffe25a" stroke-width="30" fill="none" stroke-linecap="round"/><circle cx="-56" cy="-46" r="22" fill="#ffe25a"/><circle cx="56" cy="-46" r="22" fill="#ffe25a"/></g>
+  <g id="slogan" font-size="96" font-weight="bold" fill="${C.red}" text-anchor="middle"></g>
+  <g id="card-char"></g>
+</g>
+
+<g id="wipe"></g>
+<rect width="1440" height="1080" fill="#ffb060" opacity=".07" style="mix-blend-mode:soft-light" pointer-events="none"/>
+<rect width="1440" height="1080" fill="url(#vignette)" pointer-events="none"/>
+<rect id="grainRect" width="1440" height="1080" filter="url(#grain)" opacity=".1" style="mix-blend-mode:overlay" pointer-events="none"/>
+<g id="title" opacity="0"><text x="70" y="1010" font-size="34" fill="#fff4dc" letter-spacing="6">我喜欢 · MG 样片</text></g>
+<rect id="barTop" x="0" y="0" width="1440" height="0" fill="#000"/><rect id="barBot" x="0" y="1080" width="1440" height="0" fill="#000"/>
+`;
+$('street-char').innerHTML = charSVG('c1');
+$('sky-char').innerHTML = charSVG('c2');
+$('cafe-char').innerHTML = charSVG('c3');
+$('card-char').innerHTML = charSVG('c4');
+
+// beams and light spots are generated once and moved per frame
+$('beams').innerHTML = [0, 1, 2, 3].map(i => `<polygon id="beam${i}" fill="url(#beam)"/>`).join('');
+$('spots').innerHTML = [0, 1, 2, 3, 4].map(i => `<ellipse id="spot${i}" rx="60" ry="14" fill="#fff1c8" opacity=".35" filter="url(#soft)"/>`).join('');
+$('rays').innerHTML = Array.from({ length: 16 }, (_, i) => `<polygon points="0,0 ${Math.cos(i / 8 * Math.PI - .09) * 1400},${Math.sin(i / 8 * Math.PI - .09) * 1400} ${Math.cos(i / 8 * Math.PI + .09) * 1400},${Math.sin(i / 8 * Math.PI + .09) * 1400}"/>`).join('');
+const SLOGAN = ['慢', '慢', '欢', '笑', ' ', '常', '常', '喜', '欢'];
+$('slogan').innerHTML = SLOGAN.map((ch, i) => `<text id="sl${i}" x="${720 + (i - 4) * 104}" y="0">${ch}</text>`).join('');
+$('wipe').innerHTML = [C.orange, C.mint, C.yellow].map((c, i) => `<rect id="wipe${i}" y="0" width="1600" height="1080" fill="${c}"/>`).join('');
+
+// ---- per-frame update ---------------------------------------------------
+function local(name, t) { const s = SCENES.find(x => x[0] === name); return { lt: t - s[1], len: s[2] - s[1], on: t >= s[1] && t < s[2] }; }
+
+function renderAt(t) {
+  t = clamp(t, 0, DURATION - 1e-4);
+  for (const [name] of SCENES) $('s-' + name).style.display = local(name, t).on ? '' : 'none';
+
+  // 1 street: slow pan, 小橘 strolls left to right and walks into the shade
+  { const { lt, len, on } = local('street', t); if (on) {
+    const k = lt / len;
+    $('street-cam').setAttribute('transform', `translate(${lerp(40, -90, ease(k))} 0)`);
+    const x = lerp(140, 1180, k), step = beatPos(t) * Math.PI;
+    poseChar('c1', { x, y: 800, s: 1.35, bob: Math.abs(Math.sin(step)) * 10, walk: step, armL: Math.sin(step) * 22, armR: -Math.sin(step) * 22, tilt: 3, look: [4, 0], blink: blinkAt(t) });
+  } }
+
+  // 2 sky: low angle, slow rotate + push in, 小橘 looks up at the towers
+  { const { lt, len, on } = local('sky', t); if (on) {
+    const k = lt / len;
+    $('sky-cam').setAttribute('transform', `translate(720 540) rotate(${lerp(-4, 3, ease(k))}) scale(${lerp(1, 1.12, ease(k))}) translate(-720 -540)`);
+    $('clouds').setAttribute('transform', `translate(${lt * 18} 0)`);
+    $('sun-flare').setAttribute('r', 250 + pulse(t, 4) * 30);
+    poseChar('c2', { x: 720, y: 1300, s: 3.6, bob: pulse(t) * 8, look: [lerp(0, 6, k), -9], armL: 10, armR: 10 + (k > .6 ? ease(clamp((k - .6) / .2)) * 120 : 0), blink: blinkAt(t, 1) });
+  } }
+
+  // 3 cafe: sways at the window, props bounce on the beat, light drifts
+  { const { lt, len, on } = local('cafe', t); if (on) {
+    const sw = swing(t);
+    poseChar('c3', { x: 430, y: 900, s: 2.1, tilt: sw * 7, bob: pulse(t) * 6, armL: 40 + sw * 15, armR: 140 + Math.max(0, sw) * 30, look: [-sw * 3 + 5, -2], blink: blinkAt(t, 2), mouth: lt > 3 ? .5 + .5 * Math.max(0, Math.sin(beatPos(t) * Math.PI * 2)) : 0 });
+    const b = pulse(t, 7);
+    $('cup').setAttribute('transform', `translate(930 ${905 - b * 26}) rotate(${-b * 5})`);
+    $('fries').setAttribute('transform', `translate(1130 ${895 - pulse(t + SPB / 2, 7) * 26}) rotate(${pulse(t + SPB / 2, 7) * 6})`);
+    for (let i = 0; i < 4; i++) {
+      const x0 = 780 + i * 170 + Math.sin(lt * .6 + i) * 30;
+      $('beam' + i).setAttribute('points', `${x0},150 ${x0 + 90},150 ${x0 - 520},1080 ${x0 - 700},1080`);
+      $('beam' + i).setAttribute('opacity', .55 + .25 * Math.sin(lt * 1.3 + i * 2));
+    }
+    for (let i = 0; i < 5; i++) {
+      $('spot' + i).setAttribute('cx', 260 + i * 240 + Math.sin(lt * .8 + i * 1.7) * 60);
+      $('spot' + i).setAttribute('cy', 900 + (i % 2) * 70);
+    }
+    $('patron1').setAttribute('transform', `rotate(${swing(t + SPB) * 4} 1180 770)`);
+    $('patron2').setAttribute('transform', `rotate(${-swing(t) * 4} 1320 770)`);
+  } }
+
+  // 4 card: logo pops, slogan drops in on the beats, 小橘 waves
+  { const { lt, on } = local('card', t); if (on) {
+    const pop = easeOutBack(clamp(lt / .7));
+    $('logo').setAttribute('transform', `translate(720 400) scale(${pop * (1 + pulse(t, 5) * .03)}) rotate(${(1 - pop) * -40})`);
+    $('rays').setAttribute('transform', `translate(720 400) rotate(${lt * 8})`);
+    SLOGAN.forEach((_, i) => {
+      const k = easeOutBack(clamp((lt - .5 - i * SPB / 3) / .4));
+      $('sl' + i).setAttribute('transform', `translate(0 ${lerp(640, 780, k)})`);
+      $('sl' + i).setAttribute('opacity', clamp(k * 2));
+    });
+    const wave = Math.sin(lt * 9) * 25;
+    poseChar('c4', { x: 1230, y: 1040, s: 1.5 * easeOutBack(clamp((lt - 1.2) / .6)), bob: pulse(t) * 8, armR: 150 + wave, armL: 20, tilt: -6, mouth: .8, blink: blinkAt(t, .5) });
+  } }
+
+  // colour-bar wipes centred on each cut
+  let wipeOn = false;
+  for (let s = 1; s < SCENES.length; s++) {
+    const cut = SCENES[s][1], k = (t - cut + .35) / .7;
+    if (k > 0 && k < 1) { wipeOn = true;
+      for (let i = 0; i < 3; i++) { const ki = clamp(k * 1.3 - i * .15); $('wipe' + i).setAttribute('x', lerp(1500, -1700, ease(ki))); }
+    }
+  }
+  $('wipe').style.display = wipeOn ? '' : 'none';
+
+  // open the 4:3 frame like a curtain, close it at the end
+  const open = ease(clamp(t / .9)) * (1 - ease(clamp((t - DURATION + .8) / .8)));
+  $('barTop').setAttribute('height', 540 * (1 - open));
+  $('barBot').setAttribute('y', 540 + 540 * open); $('barBot').setAttribute('height', 540 * (1 - open));
+  $('title').setAttribute('opacity', clamp((t - .8) / .5) * clamp((4.2 - t) / .6));
+
+  $('grainNoise').setAttribute('seed', Math.floor(t * 24) % 50);
+  $('time').textContent = t.toFixed(2) + 's';
+}
+window.renderAt = renderAt;
+window.DURATION = DURATION;
+
+// ---- preview playback ---------------------------------------------------
+if (new URLSearchParams(location.search).has('capture')) document.body.classList.add('capture');
+let playing = false, t0 = 0, start = 0, audio = null;
+const now = () => audio ? audio.currentTime : t0 + (performance.now() - start) / 1000;
+function tick() { if (!playing) return; let t = now(); if (t >= DURATION) { t = DURATION; toggle(false); } renderAt(t); requestAnimationFrame(tick); }
+function toggle(on = !playing) {
+  if (on) { if (now() >= DURATION) seek(0); start = performance.now(); playing = true; audio && audio.play(); tick(); }
+  else { t0 = now(); playing = false; audio && audio.pause(); }
+  $('play').textContent = playing ? '❚❚ 暂停' : '▶ 播放';
+}
+function seek(t) { t0 = clamp(t, 0, DURATION); start = performance.now(); if (audio) audio.currentTime = t0; renderAt(t0); }
+$('play').onclick = () => toggle();
+$('audio').onchange = e => { const f = e.target.files[0]; if (!f) return; toggle(false); audio = new Audio(URL.createObjectURL(f)); seek(0); };
+addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  if (e.code === 'ArrowRight') seek(now() + 1);
+  if (e.code === 'ArrowLeft') seek(now() - 1);
+});
+renderAt(0.95);
+</script>
+</body>
+</html>

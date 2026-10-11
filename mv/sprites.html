@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>像素主角候选</title>
+<style>body{margin:0;background:#f3e3c3;font-family:"WenQuanYi Zen Hei",sans-serif;color:#2a2420}
+#wrap{display:flex;gap:40px;padding:40px;justify-content:center}figure{margin:0;text-align:center}
+canvas{image-rendering:pixelated;background:#e8d2a6;border:6px solid #2a2420}figcaption{margin-top:12px;font-size:22px}</style></head>
+<body><div id="wrap"></div>
+<script>
+const PAL={k:'#2a2420',o:'#e3763a',O:'#b9572a',w:'#ffffff',e:'#1a1614',m:'#8fd1bd',M:'#5fae99',p:'#f29a8a',h:'#1c1a1a',s:'#f2c9a0',S:'#d9a67a',t:'#c9b48a',T:'#a08a62',y:'#f6d03a',r:'#e2552f',g:'#6db35e',b:'#d99a45',B:'#7a4a26'};
+const SPRITES={
+ 'A · 小橘猫（薄荷围巾）':["................","..kk........kk..",".kok........kok.",".kook......kook.",".koookkkkkkoook.","kooooooooooooook","kooooooooooooook","koooewooooewoook","koooeeooooeeoook","kpoooookkooooopk","kooooooooooooook",".kmmmmmmmmmmmmk.",".kMmmmmmmmmmmMk.",".kooooooooooook.",".koook....koook.","..kkk......kkk.."],
+ 'B · 长发少年（致敬原版造型）':["....hhhhhhhh....","..hhhhhhhhhhhh..",".hhhhhhhhhhhhhh.",".hhhhhhhhhhhhhh.","hhhhshhhhhhshhhh","hhhssssssssssshh","hhsseesssseesshh","hhsssssssssssshh","hhpssssssssspshh","h.ssssskksssss.h","h..SSSSSSSSSS..h","...mmmmrrmmmm...","..mmmmmrrmmmmm..",".mmmmmrrrrmmmmm.",".mmmmmrrrrmmmmm.",".mmMmmrrrrmmMmm.",".ssmmmrrrrmmmss.","..ssmmmrrmmmss..","....tttttttt....","....tttttttt....","....ttt..ttt....","....ttt..ttt....","....TTT..TTT....","...kkkk..kkkk..."],
+ 'C · 汉堡仔':["....kkkkkkkk....","..kkbbbbbbbbkk..",".kbbwbbbbbwbbbk.","kbbbbbbwbbbbbbbk","kbbeebbbbbbeebbk","kbpbbbbkkbbbbpbk","kggggggggggggggk",".kyyyyyyyyyyyyk.","kBBBBBBBBBBBBBBk","kBBBBBBBBBBBBBBk",".kbbbbbbbbbbbbk.","..kkkkkkkkkkkk..","....k......k....","....k......k....","...kkk....kkk...","................"],
+};
+const S=14;
+for(const [name,rows] of Object.entries(SPRITES)){
+  const c=document.createElement('canvas');c.width=(rows[0].length+4)*S;c.height=(24+4)*S;
+  const x=c.getContext('2d');const oy=(24-rows.length+2)*S;
+  rows.forEach((r,j)=>[...r].forEach((ch,i)=>{if(PAL[ch]){x.fillStyle=PAL[ch];x.fillRect((i+2)*S,oy+j*S,S,S);}}));
+  const f=document.createElement('figure');f.append(c);const cap=document.createElement('figcaption');cap.textContent=name;f.append(cap);
+  document.getElementById('wrap').append(f);
+}
+</script></body></html>
