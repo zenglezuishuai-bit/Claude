@@ -2,7 +2,7 @@
 import {
   W, H, C, clamp, lerp, prog, env, easeOutCubic, easeInOutCubic, easeOutExpo, easeOutBack, spring, hash, noise1,
   text, typed, para, wrap, rrect, withAlpha, img, clawdPixels, blinkAt, outlinePts, pathPoly, gx, gy, CELLS, EYES,
-  SANS, MONO, FUN, TEXT,
+  SANS, MONO, FUN, TEXT, boot,
 } from './lib.js';
 import { VARIANTS } from './clawd.js';
 import { STYLES } from './styles.js';
@@ -45,51 +45,68 @@ function chip(s, x, y, o = {}) {
 function font(size, weight = 400, fam = SANS) { ctx.font = `${weight} ${size}px ${fam}`; }
 
 // ---------------------------------------------------------------- 0–10 s hook
-async function hook(t) {
-  bgInk(t, 'rgba(217,119,87,0.10)');
-  // terminal prompt
-  const termA = 1 - easeInOutCubic(prog(t, 2.7, 3.2));
-  if (termA > 0) withAlpha(ctx, termA * prog(t, 0.15, 0.5), () => {
-    ctx.save(); ctx.translate(W / 2, H / 2 - 40 * (1 - termA)); ctx.scale(lerp(0.94, 1, termA), lerp(0.94, 1, termA));
-    ctx.fillStyle = C.ink2; ctx.strokeStyle = C.slate; ctx.lineWidth = 2; rrect(ctx, -620, -120, 1240, 240, 18); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = C.clay; ctx.lineWidth = 2; rrect(ctx, -590, -90, 1180, 70, 10); ctx.stroke();
-    clawdPixels(ctx, -545, -55, 3.2, { blink: blinkAt(t, [0.9]) });
-    text(ctx, 'Claude Code', -500, -44, { size: 24, weight: 700, font: MONO, color: C.ivory });
-    text(ctx, '~/mg-styles-15', 560, -44, { size: 22, font: MONO, color: C.muted, align: 'right' });
-    const s = '做 15 种 MG 动态设计风格，每种一支 10 秒成片';
-    const ty = typed(s, prog(t, 0.7, 2.3));
-    text(ctx, '>', -580, 60, { size: 34, weight: 700, font: MONO, color: C.clay });
-    const w = text(ctx, ty, -540, 60, { size: 34, weight: 500, color: C.ivory });
-    if (Math.floor(t * 2.5) % 2 === 0 || (t > 0.7 && t < 2.3)) { ctx.fillStyle = C.ivory; ctx.fillRect(-540 + w + 6, 30, 16, 36); }
-    TEXT.add(s);
+// 0–2.22 s: eight hero shots cut on 8th notes (108 BPM) · 2.22 s: the wall of 15 slams in with the claim · 7.7 s: title
+export const CUT = 60 / 108 / 2, MONTAGE = ['22-hud', '10-synthwave', '04-3d-render', '07-liquid', '20-pixel', '18-hanazi', '09-bauhaus', '06-collage'];  // keep in sync with tools/prep_frames.sh
+function stamp(s, x, y, size, k, o = {}) {
+  // a heavy caption that lands like a rubber stamp: 1.5× → 1× with a 2-frame shake
+  const sc = lerp(1.5, 1, easeOutExpo(k)), sh = k < 0.35 ? (hash(Math.floor(k * 40)) - 0.5) * 14 : 0;
+  withAlpha(ctx, clamp(k * 4), () => {
+    ctx.save(); ctx.translate(x + sh, y); ctx.scale(sc, sc); ctx.rotate(o.rot || 0);
+    text(ctx, s, 0, 0, { size, weight: 900, color: o.color || C.ivory, align: 'center', stroke: o.stroke || C.ink, strokeW: size * 0.16, ls: o.ls || 2 });
     ctx.restore();
   });
-  // wall of 15 films
-  if (t > 2.7) {
-    const gi = Math.min(299, Math.floor((t - 2.7) * 30) + 75);
-    const im = await img(`out/frames/grid/${String(gi).padStart(3, '0')}.jpg`);
-    const tw = 336, th = 189, gap = 16, X0 = (W - (5 * tw + 4 * gap)) / 2, Y0 = 150;
-    const out = easeInOutCubic(prog(t, 7.2, 8.0));
-    for (let k = 0; k < 15; k++) {
-      const c = k % 5, r = Math.floor(k / 5);
-      const s = spring(prog(t, 2.8 + (c + r) * 0.07, 3.55 + (c + r) * 0.07));
-      if (s <= 0) continue;
-      const cx = X0 + c * (tw + gap) + tw / 2, cy = Y0 + r * (th + gap) + th / 2;
-      ctx.save(); ctx.translate(lerp(cx, W / 2, out * 0.35), lerp(cy, H / 2, out * 0.35)); ctx.scale(s * (1 - out * 0.4), s * (1 - out * 0.4)); ctx.globalAlpha = 1 - out;
-      rrect(ctx, -tw / 2, -th / 2, tw, th, 10); ctx.save(); ctx.clip();
-      if (im) ctx.drawImage(im, c * 384, r * 216, 384, 216, -tw / 2, -th / 2, tw, th);
-      ctx.restore();
-      ctx.strokeStyle = 'rgba(250,249,245,.12)'; ctx.lineWidth = 1.5; rrect(ctx, -tw / 2, -th / 2, tw, th, 10); ctx.stroke();
-      ctx.restore();
-    }
-    const cap = (s, a, b, y) => withAlpha(ctx, env(t, a, b, 0.25, 0.25), () => {
-      const k = easeOutCubic(prog(t, a, a + 0.4));
-      text(ctx, s, W / 2, y + 20 * (1 - k), { size: 50, weight: 900, color: C.ivory, align: 'center' });
-    });
-    cap('这 15 支 MG 动画，没用任何生图、生视频模型', 3.7, 5.7, 900);
-    cap('每一帧画面、每一个音符，都是 Claude 写代码"算"出来的', 5.75, 7.6, 900);
-    withAlpha(ctx, env(t, 5.75, 7.6, 0.25, 0.25), () => { ctx.fillStyle = C.clay; ctx.fillRect(W / 2 - 60, 930, 120 * easeOutCubic(prog(t, 5.9, 6.5)), 5); });
+}
+async function hook(t) {
+  bgInk(t, 'rgba(217,119,87,0.10)');
+  const slam = MONTAGE.length * CUT;
+  if (t < slam) {
+    const k = Math.floor(t / CUT), lt = t - k * CUT;
+    const im = await img(`out/frames/montage/${k}/${String(Math.min(8, Math.floor(lt * 30))).padStart(3, '0')}.jpg`);
+    if (im) { const z = lerp(1.1, 1.0, easeOutCubic(lt / CUT)); ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.drawImage(im, -W / 2, -H / 2, W, H); ctx.restore(); }
+    withAlpha(ctx, 1 - lt / 0.07, () => { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); });   // flash on each cut
+    const g = ctx.createLinearGradient(0, H * 0.45, 0, H); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.75)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    stamp('这 15 支动画', W / 2, 930, 150, prog(t, 0, 0.25));
+    chip(STYLES.find((x) => x.slug === MONTAGE[k]).name, 60, 56, { size: 30, font: SANS });
+    return;
   }
+  // wall of 15 films
+  const gi = Math.min(299, Math.floor((t - slam) * 30) + 80);
+  const im = await img(`out/frames/grid/${String(gi).padStart(3, '0')}.jpg`);
+  const tw = 336, th = 189, gap = 16, X0 = (W - (5 * tw + 4 * gap)) / 2, Y0 = 110;
+  const out = easeInOutCubic(prog(t, 7.2, 8.0));
+  const shake = t < slam + 0.15 ? (hash(Math.floor(t * 60)) - 0.5) * 18 : 0;
+  ctx.save(); ctx.translate(shake, 0);
+  for (let k = 0; k < 15; k++) {
+    const c = k % 5, r = Math.floor(k / 5);
+    const s = lerp(1.25, 1, easeOutExpo(prog(t, slam + (c + r) * 0.02, slam + 0.35 + (c + r) * 0.02)));
+    const cx = X0 + c * (tw + gap) + tw / 2, cy = Y0 + r * (th + gap) + th / 2;
+    ctx.save(); ctx.translate(lerp(cx, W / 2, out * 0.35), lerp(cy, H / 2, out * 0.35)); ctx.scale(s * (1 - out * 0.4), s * (1 - out * 0.4)); ctx.globalAlpha = (1 - out) * clamp((t - slam - (c + r) * 0.02) * 8);
+    rrect(ctx, -tw / 2, -th / 2, tw, th, 10); ctx.save(); ctx.clip();
+    if (im) ctx.drawImage(im, c * 384, r * 216, 384, 216, -tw / 2, -th / 2, tw, th);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(250,249,245,.12)'; ctx.lineWidth = 1.5; rrect(ctx, -tw / 2, -th / 2, tw, th, 10); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  // the claim, then the answer
+  withAlpha(ctx, 1 - prog(t, 4.45, 4.7), () => {
+    stamp('没有一帧是 AI 画的', W / 2, 900, 112, prog(t, slam + 0.05, slam + 0.35), { color: '#FFD23F' });
+    withAlpha(ctx, prog(t, 3.1, 3.4), () => text(ctx, '没用任何生图、生视频模型', W / 2, 990, { size: 40, weight: 700, color: C.oat, align: 'center', ls: 4 }));
+  });
+  withAlpha(ctx, env(t, 4.6, 7.6, 0.2, 0.3), () => {
+    const k = easeOutCubic(prog(t, 4.6, 5.0));
+    text(ctx, '每一帧画面、每一个音符', W / 2, 870 + 20 * (1 - k), { size: 58, weight: 900, color: C.ivory, align: 'center' });
+    const k2 = easeOutBack(prog(t, 5.0, 5.45));
+    ctx.save(); ctx.translate(W / 2, 970); ctx.scale(lerp(0.6, 1, k2), lerp(0.6, 1, k2)); ctx.globalAlpha *= clamp(k2 * 3);
+    font(80, 900); const a = '都是 Claude 写代码', b = '「算」', c2 = '出来的';
+    const wa = ctx.measureText(a).width, wb = ctx.measureText(b).width, wc = ctx.measureText(c2).width, x0 = -(wa + wb + wc) / 2;
+    text(ctx, a, x0, 0, { size: 80, weight: 900, color: C.ivory });
+    text(ctx, b, x0 + wa, 0, { size: 80, weight: 900, color: C.clay });
+    text(ctx, c2, x0 + wa + wb, 0, { size: 80, weight: 900, color: C.ivory });
+    ctx.fillStyle = C.clay; ctx.fillRect(x0 + wa, 22, wb * easeOutCubic(prog(t, 5.4, 5.9)), 7);
+    ctx.restore();
+  });
   // title card
   if (t > 7.6) {
     const s = spring(prog(t, 7.7, 8.5));
@@ -550,18 +567,5 @@ window.renderAt = async (t) => {
   grain(t);
 };
 
-// preload fonts for every string the film draws: render one pass of key times so TEXT is complete, then load chunks
-(async () => {
-  const probe = [];
-  for (let s = 0; s < T.dur; s += 0.5) probe.push(s);
-  for (const s of probe) { try { await window.renderAt(s); } catch (e) { console.error(e); } }
-  const all = [...TEXT].join('') + '0123456789';
-  await Promise.all([
-    ...[400, 500, 700, 900].map((w) => document.fonts.load(`${w} 40px "Noto Sans SC"`, all)),
-    ...[400, 700].map((w) => document.fonts.load(`${w} 40px "JetBrains Mono"`, 'abcdefghijklmnopqrstuvwxyz0123456789')),
-    document.fonts.load('400 40px "ZCOOL KuaiLe"', all),
-  ]);
-  await document.fonts.ready;
-  await window.renderAt(0);
-  window.__ready = true;
-})();
+// preload the fonts for every string the film draws, sampled every 0.5 s
+boot(window.renderAt, Array.from({ length: T.dur * 2 }, (_, i) => i / 2));

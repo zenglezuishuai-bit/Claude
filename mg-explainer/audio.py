@@ -33,10 +33,20 @@ def render(m, name):
 
 # ---------------------------------------------------------------- part A: hook + pipeline
 A = recipes.explainer(duration=35.6, bpm=108, build=8.2, drop=10.0, outro=34.4)
-A.sfx(sfx.typing(22, rate=13, kind='keyboard'), at=0.72, gain=-8)
-A.sfx(sfx.ui('confirm'), at=2.35, gain=-6)
-for k in range(7):                                   # the wall pops in along its diagonals
-    A.sfx(sfx.pop('bubble', pitch=0.9 + 0.06 * k), at=2.86 + k * 0.07, gain=-13, pan=-0.6 + 0.2 * k)
+CUT = 60 / 108 / 2; SLAM = 8 * CUT                    # opening montage: 8 hero shots on 8th notes, then the wall slams in
+from mgaudio import drums
+mt = A.track('montage', level=-16, group='music')
+for k in range(8):
+    mt.add(drums.kick('punchy', 1.0 if k % 2 == 0 else 0.8), k * CUT)
+    A.sfx(sfx.impact('punch', size=0.6), at=k * CUT, gain=-13 + k * 0.6, pan=(-0.3, 0.3)[k % 2])
+    A.sfx(sfx.swish(0.18, seed=k), at=k * CUT + 0.05, gain=-15)
+A.sfx(sfx.riser(SLAM - 0.2, 'noise', seed=4), at=SLAM, gain=-12)
+A.sfx(sfx.impact('cinematic'), at=SLAM, gain=1)
+A.sfx(sfx.text_hit('slam'), at=SLAM + 0.05, gain=-3)
+A.sfx(sfx.boom(1.2), at=SLAM, gain=-6)
+A.sfx(sfx.text_hit('pop'), at=4.62, gain=-7)
+A.sfx(sfx.pop('cork', pitch=1.1), at=5.02, gain=-5)
+A.sfx(sfx.pen('marker', 0.5), at=5.42, gain=-12)
 A.sfx(sfx.whoosh(0.6, 'air', direction=1, peak=0.6), at=7.45, gain=-8)
 A.sfx(sfx.pop('cork', pitch=1.0), at=7.75, gain=-4)
 A.sfx(sfx.impact('cinematic'), at=8.17, gain=-2)

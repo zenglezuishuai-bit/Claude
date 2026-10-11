@@ -40,4 +40,21 @@ lay=""; for r in 0 1 2; do for c in 0 1 2 3 4; do lay+="$((c*384))_$((r*216))|";
 fc+="$(for k in $(seq 0 14); do printf '[v%d]' $k; done)xstack=inputs=15:layout=${lay%|}[g]"
 mkdir -p "$O/frames/grid"
 ffmpeg -nostdin -v error -y "${in[@]}" -filter_complex "$fc" -map "[g]" -t 10 -q:v 3 -start_number 0 "$O/frames/grid/%03d.jpg"
+# opening montage: 9 frames (0.3 s) of each hero moment at full size; 18-hanazi is centre-cropped to 16:9
+k=0
+while read -r slug ss; do
+  d=$O/frames/montage/$k; mkdir -p "$d"
+  if [ "$slug" = 18-hanazi ]; then vf="crop=1080:608:0:600,scale=1920:1080:flags=lanczos"; else vf="scale=1920:1080"; fi
+  ffmpeg -nostdin -v error -y -ss "$ss" -i "$V/$slug.mp4" -vf "fps=30,$vf" -frames:v 9 -q:v 2 -start_number 0 "$d/%03d.jpg"
+  k=$((k+1))
+done <<'L'
+22-hud 7.6
+10-synthwave 6.0
+04-3d-render 7.0
+07-liquid 6.6
+20-pixel 8.2
+18-hanazi 6.8
+09-bauhaus 6.2
+06-collage 8.6
+L
 echo done

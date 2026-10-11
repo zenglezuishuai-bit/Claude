@@ -1,3 +1,4 @@
 node_modules/
 out/*
 !out/video.mp4
+!out/short.mp4

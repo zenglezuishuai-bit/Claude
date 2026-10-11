@@ -148,3 +148,17 @@ export function clawdPixels(ctx, cx, cy, u, o = {}) {
 }
 // blink curve: closes for ~4 frames at given times
 export function blinkAt(t, times) { for (const b of times) { const d = Math.abs(t - b); if (d < 0.07) return 1 - d / 0.07; } return 0; }
+
+// Render a pass over `times` so TEXT collects every string, load the font chunks those strings need, then flag ready.
+export async function boot(renderAt, times) {
+  for (const s of times) { try { await renderAt(s); } catch (e) { console.error(e); } }
+  const all = [...TEXT].join('') + '0123456789';
+  await Promise.all([
+    ...[400, 700, 900].map((w) => document.fonts.load(`${w} 40px "Noto Sans SC"`, all)),
+    ...[400, 700].map((w) => document.fonts.load(`${w} 40px "JetBrains Mono"`, 'abcdefghijklmnopqrstuvwxyz0123456789')),
+    document.fonts.load('400 40px "ZCOOL KuaiLe"', all),
+  ]);
+  await document.fonts.ready;
+  await renderAt(times[0] || 0);
+  window.__ready = true;
+}
